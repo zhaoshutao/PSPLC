@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.6">
+  <POU Name="F_GetSysTime" Id="{db418080-88cc-4e5d-bad1-a178be8bfab5}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION F_GetSysTime : ULINT
+VAR_INPUT
+END_VAR
+VAR
+	GetSystemTime:GETSYSTEMTIME;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[GetSystemTime(timeLoDW=>,timeHiDW=>);
+F_GetSysTime:=UDINT_TO_ULINT(GetSystemTime.timeHiDW)*4294967296+UDINT_TO_ULINT(GetSystemTime.timeLoDW)/10000;]]></ST>
+    </Implementation>
+    <LineIds Name="F_GetSysTime">
+      <LineId Id="7" Count="0" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

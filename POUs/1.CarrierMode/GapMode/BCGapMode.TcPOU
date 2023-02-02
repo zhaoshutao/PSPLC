@@ -1,0 +1,544 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.6">
+  <POU Name="BCGapMode" Id="{dd246ce2-818d-478c-bdc8-14be3f4397d7}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM BCGapMode
+VAR
+	(*key Command*)
+	btn_Power:BOOL;
+	btn_PowerOn: BOOL;
+	btn_PowerOff: BOOL;
+(*GapMode*)
+	BCGapPositionNew:LREAL:=20;
+	BCGapVelocityNew:LREAL:=1;
+	BCGapPositionDisplay:LREAL;
+	BCGapVelocityDisplay:LREAL;
+	btn_BCGapMove:BOOL;
+	btn_BCGapStop:BOOL;
+	(*Var*)
+	fb_ton1:TON;
+	fb_ton2:TON;
+	fb_ton3:TON;
+	(*Status*)
+	State:DINT;
+	Busy:BOOL;
+	InitPowerDone:BOOL;
+	InitCompensationDatasDone:BOOL;
+	(*FB*)
+	m_state: DINT;
+	s_state: DINT;
+	(*¼ì²âµ½ÏÞÎ»£¬»Ö¸´Move×´Ì¬*)
+	FTrig_ReachLS: F_TRIG;
+	FTrig_btn_GapMove: F_TRIG;
+	GapOutRange: BOOL;
+	(*PowerOff*)
+	d_state: DINT;
+	i: INT;
+	j: INT;
+	moni_State:DINT;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[BCGapPositionDisplay:=(LeftTopLinPositionDisplay+RightTopLinPositionDisplay+LeftBottomLinPositionDisplay+RightBottomLinPositionDisplay)/2;
+BCGapVelocityDisplay:=(LeftTopLinVelocityDisplay+RightTopLinVelocityDisplay+LeftBottomLinVelocityDisplay+RightBottomLinVelocityDisplay)/2;
+(*********************************************************************btn_PowerOn************************************************************)
+IF btn_Power AND st_Power=0 THEN
+	btn_PowerOn:=TRUE;
+	btn_Power:=FALSE;
+END_IF
+IF btn_Power AND st_Power=1 THEN
+	btn_PowerOff:=TRUE;
+	btn_Power:=FALSE;
+END_IF
+//
+IF btn_PowerOn THEN
+	A_PowerOn();
+END_IF
+(******************************************************ÉÏµç×´Ì¬£¬´¦ÓÚñîºÏ×´Ì¬£¬ESTOP***********************************************)
+IF NOT btn_PowerOff THEN
+	IF st_Power=1 AND st_Couple<>0THEN
+		Error:=TRUE;
+		ErrorID:=101;
+		LeftTopLinMoveIndicator:=0;
+		RightTopLinMoveIndicator:=0;
+		LeftBottomLinMoveIndicator:=0;
+		RightBottomLinMoveIndicator:=0;
+		FB_PlcEmergencyStop();
+		LED_Error:=TRUE;
+	END_IF
+END_IF
+(*********************************************************************Monitor All Carrirt Position***********************************************)
+A_MonitoringAllAxis();
+(*********************************************************************A_PosDiffDetection***********************************************)
+A_PosDiffDetection();
+(*****************************************************************A_InitCompensationDatas************************************************)
+A_InitCompensationData();
+(*********************************************************************btn_BCMove*****************************************************************)
+IF InitPowerDone AND InitCompensationDatasDone THEN
+	IF btn_BCGapMove THEN
+		CASE m_state OF
+			0:
+				FB_Move.Mode:=5;						(*1£ºgapÄ£Ê½£»2£ºµ¥ÁºÄ£Ê½£¬3£ºtaperÄ£Ê½£¬4:DebugÄ£Ê½£¬5£º²¹³¥GapÄ£Ê½*)
+				FB_Move.CoupleState:=st_Couple;			(*ñîºÏ×´Ì¬ÊäÈë*)
+				FB_Move.PowerState:=st_Power;			(*µçÔ´×´Ì¬ÊäÈë*)
+				FB_Move.BCGapMove:=TRUE;				(*Execute TRUE*)
+				FB_Move.BCLeftTopPosition:=LeftTopLinPositionNew;(*Ã¿ÖáËÙ¶ÈÎ»ÖÃÊäÈë*)
+				FB_Move.BCLeftTopVelocity:=BCGapVelocityNew/2;
+				FB_Move.BCRightTopPosition:=RightTopLinPositionNew;
+				FB_Move.BCRightTopVelocity:=BCGapVelocityNew/2;
+				FB_Move.BCLeftBottomPosition:=LeftBottomLinPositionNew;
+				FB_Move.BCLeftBottomVelocity:=BCGapVelocityNew/2;
+				FB_Move.BCRightBottomPosition:=RightBottomLinPositionNew;
+				FB_Move.BCRightBottomVelocity:=BCGapVelocityNew/2;
+				FB_Move();								(*Æô¶¯FB*)
+				IF LeftTopLinPositionNew-Pos_LeftTopLin>0.001 THEN	(*ÔË¶¯·½ÏòÖ¸Ê¾*)
+					LeftTopLinMoveIndicator:=1;
+				ELSIF LeftTopLinPositionNew-Pos_LeftTopLin<0.001 THEN
+					LeftTopLinMoveIndicator:=-1;
+				ELSE
+					LeftTopLinMoveIndicator:=0;
+				END_IF
+				IF RightTopLinPositionNew-Pos_RightTopLin>0.001 THEN	(*ÔË¶¯·½ÏòÖ¸Ê¾*)
+					RightTopLinMoveIndicator:=1;
+				ELSIF RightTopLinPositionNew-Pos_RightTopLin<0.001 THEN
+					RightTopLinMoveIndicator:=-1;
+				ELSE
+					RightTopLinMoveIndicator:=0;
+				END_IF
+				IF LeftBottomLinPositionNew-Pos_LeftBottomLin>0.001 THEN	(*ÔË¶¯·½ÏòÖ¸Ê¾*)
+					LeftBottomLinMoveIndicator:=1;
+				ELSIF LeftBottomLinPositionNew-Pos_LeftBottomLin<0.001 THEN
+					LeftBottomLinMoveIndicator:=-1;
+				ELSE
+					LeftBottomLinMoveIndicator:=0;
+				END_IF
+				IF RightBottomLinPositionNew-Pos_RightBottomLin>0.001 THEN	(*ÔË¶¯·½ÏòÖ¸Ê¾*)
+					RightBottomLinMoveIndicator:=1;
+				ELSIF RightBottomLinPositionNew-Pos_RightBottomLin<0.001 THEN
+					RightBottomLinMoveIndicator:=-1;
+				ELSE
+					RightBottomLinMoveIndicator:=0;
+				END_IF
+				m_state:=1;
+			1:
+				FB_Move();
+				IF NOT FB_Move.BCGapDone THEN			(*ÔË¶¯Î´Íê³É£¬Ñ­»·*)
+					Led_Run:=TRUE;
+					m_state:=1;
+
+				ELSE									(*ÔË¶¯Íê³É£¬ÏÂÒ»²½*)
+					m_state:=88;
+				END_IF
+			88:
+				btn_BCGapMove:=FALSE;					(*×´Ì¬»Ö¸´*)
+				Led_Run:=FALSE;
+				m_state:=0;
+				LeftTopLinMoveIndicator:=0;
+				RightTopLinMoveIndicator:=0;
+				LeftBottomLinMoveIndicator:=0;
+				RightBottomLinMoveIndicator:=0;
+		END_CASE
+	END_IF
+END_IF
+(*******************************************************************btn_Stop********************************************************************)
+IF btn_BCGapStop THEN
+	Led_Run:=FALSE;
+	LeftTopLinMoveIndicator:=0;
+	RightTopLinMoveIndicator:=0;
+	LeftBottomLinMoveIndicator:=0;
+	RightBottomLinMoveIndicator:=0;
+	FB_Move.BCGapReset:=TRUE;							(*¸øÔË¶¯FB¸øÍ£Ö¹ÐÅºÅ£¬Ê¹FB_Move×´Ì¬»Ö¸´*)
+	FB_Move();											(*Æô¶¯FB_Move*)
+	btn_BCGapMove:=FALSE;								(*btn_GapMove:=FALSE*)
+	m_state:=0;											(*m_state:=0;*)
+	CASE s_state OF
+			0:
+				FB_Stop.Mode:=5;							(*1£ºgapÄ£Ê½£»2£ºµ¥ÁºÄ£Ê½£»3£ºtaperÄ£Ê½£»4£ºDebugÄ£Ê½£»5£ºBCGapÄ£Ê½*)
+				FB_Stop.CoupleState:=st_Couple;			(*ñîºÏ×´Ì¬ÊäÈë*)
+				FB_Stop.PowerState:=st_Power;				(*µçÔ´×´Ì¬ÊäÈë*)
+				FB_Stop.BCGapStop:=TRUE;				(*Execute TRUE*)
+				FB_Stop();								(*Æô¶¯FB*)
+				s_state:=1;
+			1:
+				FB_Stop();
+				IF NOT FB_Stop.BCGapDone THEN			(*Í£Ö¹Î´Íê³É£¬Ñ­»·*)
+					s_state:=1;
+				ELSE									(*Í£Ö¹Íê³É£¬ÏÂÒ»²½*)
+					s_state:=88;
+				END_IF
+			88:
+				btn_BCGapStop:=FALSE;						(*»Ö¸´×´Ì¬*)
+				FB_Move.BCGapReset:=FALSE;				(*ÔËÐÐFB*)
+				s_state:=0;
+		END_CASE
+END_IF
+(*********************************************************************btn_PowerOff************************************************************)
+IF btn_PowerOff THEN
+	A_PowerOff();
+END_IF
+(*********************************************************************ÏÞÎ»Åö´¥×´Ì¬»Ö¸´************************************************************)
+(*Èç¹û¼ì²âµ½ÏØÏÞÎ»¿ª¹ØÏÂ½µÑØ£¬»Ö¸´Move×´Ì¬*)
+FTrig_ReachLS(CLK:=Unreach_LS_Top AND Unreach_LS_Bottom);
+IF FTrig_ReachLS.Q THEN
+	btn_BCGapStop:=TRUE;
+END_IF
+(*Èç¹û¼ì²âµ½TopÏÞÎ»¿ª¹ØFALSE£¬ÇÒÄ¿±êÎ»ÖÃ´óÓÚµ±Ç°Î»ÖÃÊ±£¬»òÕßÏà·´Ê±£¬»Ö¸´Move×´Ì¬*)
+IF NOT Unreach_LS_Top AND BCGapPositionNew-BCGapPositionDisplay>0.0005 AND btn_BCGapMove THEN
+	btn_BCGapStop:=TRUE;
+END_IF
+IF NOT Unreach_LS_Bottom AND BCGapPositionNew-BCGapPositionDisplay<0.0005 AND btn_BCGapMove THEN
+	btn_BCGapStop:=TRUE;
+END_IF]]></ST>
+    </Implementation>
+    <Action Name="A_InitCompensationData" Id="{e57b3240-c96c-40f2-8a48-faf427e25695}">
+      <Implementation>
+        <ST><![CDATA[(*BCGapPositionNewºÍBCGapVelocityNew³¬³ö·¶Î§£¬ESTOP*)
+(*IF BCGapPositionNew<-100 OR BCGapPositionNew>400 THEN
+	btn_BCGapStop:=TRUE;
+	FB_PlcEmergencyStop();
+	Error:=TRUE;
+	ErrorID:=20;
+	LED_Error:=TRUE;
+	InitCompensationDatasDone:=FALSE;
+ELSIF  BCGapVelocityNew<0 OR  BCGapVelocityNew>2 THEN
+	btn_BCGapStop:=TRUE;
+	FB_PlcEmergencyStop();
+	Error:=TRUE;
+	ErrorID:=21;
+	LED_Error:=TRUE;
+	InitCompensationDatasDone:=FALSE;
+END_IF
+*)
+(*¸ù¾ÝÊäÈëGapPosition²¹³¥²¢·Ö½âµ½Ã¿¸öÖá£¬¼ÆËãÃ¿¸öÖáµÄÎ»ÖÃ*)
+IF USE_SingleAxis_Compensation THEN
+	(*IF LeftTopLin.Status.NotMoving AND RightTopLin.Status.NotMoving AND LeftBottomLin.Status.NotMoving AND RightBottomLin.Status.NotMoving THEN*)
+		FOR	i:= 1 TO 17 DO
+			IF BCGapPositionNew/2<M_Compensation[i+1].Encoder AND BCGapPositionNew/2>=M_Compensation[i].Encoder THEN
+				IF i<>18 THEN
+					LeftTopLinPositionNew:=(((BCGapPositionNew/2-M_Compensation[i].Encoder)*(M_Compensation[i+1].LeftTop-M_Compensation[i].LeftTop))
+							/(M_Compensation[i+1].Encoder-M_Compensation[i].Encoder))+M_Compensation[i].LeftTop;
+					RightTopLinPositionNew:=(((BCGapPositionNew/2-M_Compensation[i].Encoder)*(M_Compensation[i+1].RightTop-M_Compensation[i].RightTop))
+							/(M_Compensation[i+1].Encoder-M_Compensation[i].Encoder))+M_Compensation[i].RightTop;
+					LeftBottomLinPositionNew:=(((BCGapPositionNew/2-M_Compensation[i].Encoder)*(M_Compensation[i+1].LeftBottom-M_Compensation[i].LeftBottom))
+							/(M_Compensation[i+1].Encoder-M_Compensation[i].Encoder))+M_Compensation[i].LeftBottom;
+					RightBottomLinPositionNew:=(((BCGapPositionNew/2-M_Compensation[i].Encoder)*(M_Compensation[i+1].RightBottom-M_Compensation[i].RightBottom))
+							/(M_Compensation[i+1].Encoder-M_Compensation[i].Encoder))+M_Compensation[i].RightBottom;
+					M_CompensationNumber:=i;
+					InitCompensationDatasDone:=TRUE;
+(*
+					(*¸ù¾ÝÃ¿¸öÖáµÄÊµ¼ÊÎ»ÖÃ£¬·´ËãÐèÒªÔÚ¿ØÖÆÏµÍ³UIÖÐÏÔÊ¾µÄÎ»ÖÃ*)
+					LeftTopLinPositionDisplay:=(((M_Compensation[i+1].Encoder-M_Compensation[i].Encoder)*(Pos_LeftTopLin-M_Compensation[i].LeftTop))
+							/(M_Compensation[i+1].LeftTop-M_Compensation[i].LeftTop))+M_Compensation[i].Encoder;
+					RightTopLinPositionDisplay:=(((M_Compensation[i+1].Encoder-M_Compensation[i].Encoder)*(Pos_RightTopLin-M_Compensation[i].RightTop))
+							/(M_Compensation[i+1].RightTop-M_Compensation[i].LeftTop))+M_Compensation[i].Encoder;
+					LeftBottomLinPositionDisplay:=(((M_Compensation[i+1].Encoder-M_Compensation[i].Encoder)*(Pos_LeftBottomLin-M_Compensation[i].LeftBottom))
+							/(M_Compensation[i+1].LeftBottom-M_Compensation[i].LeftBottom))+M_Compensation[i].Encoder;
+					RightBottomLinPositionDisplay:=(((M_Compensation[i+1].Encoder-M_Compensation[i].Encoder)*(Pos_RightBottomLin-M_Compensation[i].RightBottom))
+							/(M_Compensation[i+1].RightBottom-M_Compensation[i].RightBottom))+M_Compensation[i].Encoder;
+*)
+				ELSIF i=18 AND BCGapPositionNew/2=M_Compensation[i].Encoder THEN		(*Gap=14µÄÌØÊâÇé¿ö*)
+					(**)
+					LeftTopLinPositionNew:=M_Compensation[i].LeftTop;
+					RightTopLinPositionNew:=M_Compensation[i].RightTop;
+					LeftBottomLinPositionNew:=M_Compensation[i].LeftBottom;
+					RightBottomLinPositionNew:=M_Compensation[i].RightBottom;
+					(*
+					LeftTopLinPositionDisplay:=(((M_Compensation[i+1].Encoder-M_Compensation[i].Encoder)*(Pos_LeftTopLin-M_Compensation[i].LeftTop))
+							/(M_Compensation[i+1].LeftTop-M_Compensation[i].LeftTop))+M_Compensation[i].Encoder;
+					RightTopLinPositionDisplay:=(((M_Compensation[i+1].Encoder-M_Compensation[i].Encoder)*(Pos_RightTopLin-M_Compensation[i].RightTop))
+							/(M_Compensation[i+1].RightTop-M_Compensation[i].LeftTop))+M_Compensation[i].Encoder;
+					LeftBottomLinPositionDisplay:=(((M_Compensation[i+1].Encoder-M_Compensation[i].Encoder)*(Pos_LeftBottomLin-M_Compensation[i].LeftBottom))
+							/(M_Compensation[i+1].LeftBottom-M_Compensation[i].LeftBottom))+M_Compensation[i].Encoder;
+					RightBottomLinPositionDisplay:=(((M_Compensation[i+1].Encoder-M_Compensation[i].Encoder)*(Pos_RightBottomLin-M_Compensation[i].RightBottom))
+							/(M_Compensation[i+1].RightBottom-M_Compensation[i].RightBottom))+M_Compensation[i].Encoder;
+*)
+					M_CompensationNumber:=i;
+					InitCompensationDatasDone:=TRUE;
+				ELSE(*Gap>14µÄÇé¿ö*)
+					LeftTopLinPositionNew:=BCGapPositionNew/2;
+					RightTopLinPositionNew:=BCGapPositionNew/2;
+					LeftBottomLinPositionNew:=BCGapPositionNew/2;
+					RightBottomLinPositionNew:=BCGapPositionNew/2;
+					(*
+					LeftTopLinPositionDisplay:=Pos_LeftTopLin;
+					RightTopLinPositionDisplay:=Pos_RightTopLin;
+					LeftBottomLinPositionDisplay:=Pos_LeftBottomLin;
+					RightBottomLinPositionDisplay:=Pos_RightBottomLin;
+*)
+					M_CompensationNumber:=i;
+					InitCompensationDatasDone:=TRUE;
+				END_IF
+			END_IF
+		END_FOR
+
+		FOR j:= 1 TO 17 DO
+			IF Pos_RightBottomLin<M_Compensation[j+1].RightBottom AND Pos_RightBottomLin>=M_Compensation[j].RightBottom THEN
+				IF j<>18 THEN
+					(*¸ù¾ÝÃ¿¸öÖáµÄÊµ¼ÊÎ»ÖÃ£¬·´ËãÐèÒªÔÚ¿ØÖÆÏµÍ³UIÖÐÏÔÊ¾µÄÎ»ÖÃ*)
+					LeftTopLinPositionDisplay:=(((M_Compensation[j+1].Encoder-M_Compensation[j].Encoder)*(Pos_LeftTopLin-M_Compensation[j].LeftTop))
+							/(M_Compensation[j+1].LeftTop-M_Compensation[j].LeftTop))+M_Compensation[j].Encoder;
+					RightTopLinPositionDisplay:=(((M_Compensation[j+1].Encoder-M_Compensation[j].Encoder)*(Pos_RightTopLin-M_Compensation[j].RightTop))
+							/(M_Compensation[j+1].RightTop-M_Compensation[j].RightTop))+M_Compensation[j].Encoder;
+					LeftBottomLinPositionDisplay:=(((M_Compensation[j+1].Encoder-M_Compensation[j].Encoder)*(Pos_LeftBottomLin-M_Compensation[j].LeftBottom))
+							/(M_Compensation[j+1].LeftBottom-M_Compensation[j].LeftBottom))+M_Compensation[j].Encoder;
+					RightBottomLinPositionDisplay:=(((M_Compensation[j+1].Encoder-M_Compensation[j].Encoder)*(Pos_RightBottomLin-M_Compensation[j].RightBottom))
+							/(M_Compensation[j+1].RightBottom-M_Compensation[j].RightBottom))+M_Compensation[j].Encoder;
+					M_DisplayNumber:=j;
+				ELSIF j=18 AND BCGapPositionNew/2=M_Compensation[j].Encoder THEN		(*Gap=14µÄÌØÊâÇé¿ö*)
+					(**)
+					LeftTopLinPositionDisplay:=(((M_Compensation[j+1].Encoder-M_Compensation[j].Encoder)*(Pos_LeftTopLin-M_Compensation[j].LeftTop))
+							/(M_Compensation[j+1].LeftTop-M_Compensation[j].LeftTop))+M_Compensation[j].Encoder;
+					RightTopLinPositionDisplay:=(((M_Compensation[j+1].Encoder-M_Compensation[j].Encoder)*(Pos_RightTopLin-M_Compensation[j].RightTop))
+							/(M_Compensation[j+1].RightTop-M_Compensation[j].LeftTop))+M_Compensation[j].Encoder;
+					LeftBottomLinPositionDisplay:=(((M_Compensation[j+1].Encoder-M_Compensation[j].Encoder)*(Pos_LeftBottomLin-M_Compensation[j].LeftBottom))
+							/(M_Compensation[j+1].LeftBottom-M_Compensation[j].LeftBottom))+M_Compensation[j].Encoder;
+					RightBottomLinPositionDisplay:=(((M_Compensation[j+1].Encoder-M_Compensation[j].Encoder)*(Pos_RightBottomLin-M_Compensation[j].RightBottom))
+							/(M_Compensation[j+1].RightBottom-M_Compensation[j].RightBottom))+M_Compensation[j].Encoder;
+					M_DisplayNumber:=j;
+				ELSE(*Gap>14µÄÇé¿ö*)
+					(**)
+					LeftTopLinPositionDisplay:=Pos_LeftTopLin;
+					RightTopLinPositionDisplay:=Pos_RightTopLin;
+					LeftBottomLinPositionDisplay:=Pos_LeftBottomLin;
+					RightBottomLinPositionDisplay:=Pos_RightBottomLin;
+					M_DisplayNumber:=j;
+				END_IF
+			END_IF
+		END_FOR
+	(*END_IF*)
+ELSE
+	LeftTopLinPositionNew:=BCGapPositionNew/2;
+	RightTopLinPositionNew:=BCGapPositionNew/2;
+	LeftBottomLinPositionNew:=BCGapPositionNew/2;
+	RightBottomLinPositionNew:=BCGapPositionNew/2;
+	LeftTopLinPositionDisplay:=Pos_LeftTopLin;
+	RightTopLinPositionDisplay:=Pos_RightTopLin;
+	LeftBottomLinPositionDisplay:=Pos_LeftBottomLin;
+	RightBottomLinPositionDisplay:=Pos_RightBottomLin;
+	M_CompensationNumber:=0;
+	InitCompensationDatasDone:=TRUE;
+END_IF
+
+LeftTopLinVelocityDisplay:=Velo_LeftTopLin;
+RightTopLinVelocityDisplay:=Velo_RightTopLin;
+LeftBottomLinVelocityDisplay:=Velo_LeftBottomLin;
+RightBottomLinVelocityDisplay:=Velo_RightBottomLin;
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="A_MonitoringAllAxis" Id="{88dd2424-b834-4cb1-bb1d-b48ff9fb12b2}">
+      <Implementation>
+        <ST><![CDATA[(****************************************************************
+NAME:			A_MonitoringAllAxis
+DATA:			2018.1.9
+VERSION:		1.0.0
+DESCRIPTION:	
+				Ã¿´ÎÑ­»·¾ùÖ´ÐÐÖáÎ»ÖÃºÍÖáÔË¶¯µÄ¼ì²é
+				2.4Öá¹âÕ¤³ßÎ»ÖÃ¡¢ËÙ¶È¶Ô±È¼ì²é
+HISTORY:
+				2017.1.9		NEW
+
+***************************************************************)
+
+(*************************************************************************************2.4Öá¹âÕ¤³ßÎ»ÖÃ¡¢ËÙ¶È¶Ô±È¼ì²é**********************************************************************)
+IF  st_Power<>0 THEN
+CASE moni_State OF
+(*Top Î»ÖÃºÍËÙ¶È±È¶Ô*)
+0:
+		(*Î»ÖÃ*)
+		(*Top*)
+		Diff_BCTopPos_actual:=ABS(Pos_leftTopLin-Pos_RightTopLin);
+		(*Bottom*)
+		Diff_BCBottomPos_actual:=ABS(Pos_LeftBottomLin-Pos_RightBottomLin);
+		(*Left*)
+		Diff_BCLeftPos_actual:=ABS(Pos_LeftTopLin-Pos_LeftBottomLin);
+		(*Right*)
+		Diff_BCRightPos_actual:=ABS(Pos_RightTopLin-Pos_RightBottomLin);
+		(*ËÙ¶È*)
+		(*Top*)
+		Diff_BCTopVelo_actual:=ABS(Velo_leftTopLin-Velo_RightTopLin);
+		(*Bottom*)
+		Diff_BCBottomVelo_actual:=ABS(Velo_LeftBottomLin-Velo_RightBottomLin);
+		(*Left*)
+		Diff_BCLeftVelo_actual:=ABS(Velo_LeftTopLin-Velo_LeftBottomLin);
+		(*Right*)
+		Diff_BCRightVelo_actual:=ABS(Velo_RightTopLin-Velo_RightBottomLin);
+		IF Diff_BCTopPos_actual >Threshold_BCTopPos THEN
+				ErrorID:=11;
+				moni_State:=-100;
+		ELSIF Diff_BCTopVelo_actual>Threshold_BCTopVelo  THEN
+				ErrorID:=12;
+				moni_State:=-100;
+		(*Bottom Î»ÖÃºÍËÙ¶È±È¶Ô*)
+		ELSIF Diff_BCBottomPos_actual>Threshold_BCBottomPos THEN
+				ErrorID:=13;
+				moni_State:=-100;
+		ELSIF Diff_BCBottomVelo_actual>Threshold_BCBottomVelo  THEN
+				ErrorID:=14;
+				moni_State:=-100;
+		(*Left Î»ÖÃºÍËÙ¶È±È¶Ô*)
+		ELSIF Diff_BCLeftPos_actual>Threshold_BCLeftPos  THEN
+				ErrorID:=15;
+				moni_State:=-100;
+		ELSIF  Diff_BCLeftVelo_actual>Threshold_BCLeftVelo THEN
+				ErrorID:=16;
+				moni_State:=-100;
+		(*Right Î»ÖÃºÍËÙ¶È±È¶Ô*)
+		ELSIF Diff_BCRightPos_actual>Threshold_BCRightPos  THEN
+				ErrorID:=17;
+				moni_State:=-100;
+		ELSIF  Diff_BCRightVelo_actual>Threshold_BCRightVelo THEN
+				ErrorID:=18;
+				moni_State:=-100;
+		END_IF
+-100:
+		btn_BCGapStop:=TRUE;
+		FB_PlcEmergencyStop();
+		Error:=TRUE;
+		LED_Error:=TRUE;
+END_CASE
+END_IF]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="A_PosDiffDetection" Id="{07eca376-9242-40ff-94f0-6bd6eaf223fb}">
+      <Implementation>
+        <ST><![CDATA[IF ABS(PosDiff_LeftTopLin_actual-PosDiff_RightTopLin_actual)>0.2 THEN		(*ÉÏÖá×óÓÒLagDistanceÖ®²î*)
+	ErrorID:=51;
+	Error:=TRUE;
+	btn_BCGapStop:=TRUE;
+	FB_PlcEmergencyStop();
+	LED_Error:=TRUE;
+ELSIF ABS(PosDiff_LeftBottomLin_actual-PosDiff_RightBottomLin_actual)>0.2 THEN
+	ErrorID:=53;
+	Error:=TRUE;
+	btn_BCGapStop:=TRUE;
+	FB_PlcEmergencyStop();
+	LED_Error:=TRUE;
+END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="A_PowerOff" Id="{355beaf1-dc8d-4073-84b5-cc89b1c626f0}">
+      <Implementation>
+        <ST><![CDATA[CASE d_state OF
+		0:(*PowerOff*)
+			FB_Power(Off:=TRUE);
+				d_state:=1;
+		1:
+			IF NOT FB_power.OffStatus THEN
+				d_state:=1;
+			ELSE
+				d_state:=88;
+			END_IF
+		88:(*ResetAllState*)
+			btn_PowerOn:=FALSE;
+			btn_BCGapMove:=FALSE;
+			btn_BCGapStop:=FALSE;
+			LeftTopLinMoveIndicator:=0;
+			RightTopLinMoveIndicator:=0;
+			LeftBottomLinMoveIndicator:=0;
+			RightBottomLinMoveIndicator:=0;
+			fb_ton1.IN:=FALSE;
+			fb_ton2.IN:=FALSE;
+			fb_ton3.IN:=FALSE;
+			State:=0;
+			Busy:=FALSE;
+			InitPowerDone:=FALSE;
+			InitCompensationDatasDone:=FALSE;
+			Error:=FALSE;
+			ErrorID:=0;
+			m_state:=0;
+			s_state:=0;
+			btn_PowerOff:=FALSE;
+			d_state:=0;
+			Led_Run:=FALSE;
+			Led_Error:=FALSE;
+			moni_State:=0;
+			i:=0;
+END_CASE
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="A_PowerOn" Id="{123e2a19-e7db-482c-b3dd-85d506374910}">
+      <Implementation>
+        <ST><![CDATA[(****************************************************************
+NAME:			A_PowerOn
+DATA:			2018.1.9
+VERSION:		1.0.0
+DESCRIPTION:	
+				ÉÏµãÃüÁîºó£¬Ë³ÐòÖ´ÐÐ£º
+				1.FB_PowerOn
+				·µ»ØÖ´ÐÐÊÇ·ñ³É¹¦
+HISTORY:
+				2019.1.9		NEW
+
+***************************************************************)
+fb_ton3(PT:=t#0.5s);
+CASE State OF
+	0:	(*FB_Power_On*)
+		FB_Power(On:=TRUE);
+		fb_ton3.IN:=TRUE;
+		State:=1;
+	1:	(*wait*)
+		FB_power();
+		IF NOT FB_power.OnStatus THEN		(*FB_Power_OnÃ»ÓÐÖ´ÐÐÍê£¬wait£¬³¬Ê±FB Error*)
+			IF NOT fb_ton3.Q THEN
+				State:=1;
+			ELSE
+				ErrorID:=1;
+				State:=99;
+			END_IF
+		ELSE
+			State:=88;
+		END_IF
+	88:	(*All Done*)
+		btn_PowerOn:=FALSE;
+		State:=0;
+		Error:=FALSE;
+		ErrorID:=0;
+		Busy:=FALSE;
+		InitPowerDone:=TRUE;
+		FB_power.On:=FALSE;
+		fb_ton3.IN:=FALSE;
+		LED_Error:=FALSE;
+	99:
+		btn_PowerOn:=FALSE;
+		State:=99;
+		Error:=TRUE;
+		Busy:=FALSE;
+		InitPowerDone:=FALSE;
+		fb_ton3.IN:=FALSE;
+		LED_Error:=TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Action>
+    <LineIds Name="BCGapMode">
+      <LineId Id="36" Count="2" />
+      <LineId Id="234" Count="1" />
+      <LineId Id="241" Count="0" />
+      <LineId Id="236" Count="2" />
+      <LineId Id="240" Count="0" />
+      <LineId Id="239" Count="0" />
+      <LineId Id="222" Count="0" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="228" Count="0" />
+      <LineId Id="41" Count="135" />
+    </LineIds>
+    <LineIds Name="BCGapMode.A_InitCompensationData">
+      <LineId Id="0" Count="14" />
+      <LineId Id="133" Count="0" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="16" Count="114" />
+    </LineIds>
+    <LineIds Name="BCGapMode.A_MonitoringAllAxis">
+      <LineId Id="0" Count="69" />
+    </LineIds>
+    <LineIds Name="BCGapMode.A_PosDiffDetection">
+      <LineId Id="0" Count="13" />
+    </LineIds>
+    <LineIds Name="BCGapMode.A_PowerOff">
+      <LineId Id="0" Count="36" />
+    </LineIds>
+    <LineIds Name="BCGapMode.A_PowerOn">
+      <LineId Id="0" Count="48" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

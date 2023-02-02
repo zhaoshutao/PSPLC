@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.6">
+  <POU Name="FB_PlcEmergencyStop" Id="{22ffe25d-e1eb-44a0-8541-4915da76143d}" SpecialFunc="None">
+    <Declaration><![CDATA[(****************************************************************
+NAME:			FB_PlcEmergencyStop
+DATA:			2017.2.15
+VERSION:		1.0.0
+DESCRIPTION:	PlcEmergencyStop
+HISTORY:
+				2017.2.15		NEW
+
+***************************************************************)
+FUNCTION_BLOCK FB_PlcEmergencyStop
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+	FbID:DINT:=2001;
+	Busy:BOOL;
+END_VAR
+VAR
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Plc_EmergencyStop:=FALSE;//FALSE is been triggered.
+Busy:=TRUE;]]></ST>
+    </Implementation>
+    <LineIds Name="FB_PlcEmergencyStop">
+      <LineId Id="18" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

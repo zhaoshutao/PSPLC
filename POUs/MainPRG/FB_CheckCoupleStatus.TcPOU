@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.6">
+  <POU Name="FB_CheckCoupleStatus" Id="{b21eb173-6e8f-4f3b-b5aa-89c47c33bd7e}" SpecialFunc="None">
+    <Declaration><![CDATA[(****************************************************************
+NAME:			FB_CheckCoupleStatus
+DATA:			2017.2.17
+VERSION:		1.0.0
+DESCRIPTION:	FB_CheckCoupleStatus
+HISTORY:
+				2017.2.17		NEW
+
+***************************************************************)
+FUNCTION_BLOCK FB_CheckCoupleStatus
+VAR_INPUT
+	Check:BOOL;
+END_VAR
+VAR_OUTPUT
+	CoupleState:DINT;
+	FbID:DINT:=1001;
+	Busy:BOOL;
+	Error:BOOL;
+	ErrorID:DINT;
+END_VAR
+VAR
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF Check THEN
+	Busy:=TRUE;
+	IF LeftTopLin.NcToPlc.CoupleState=1 AND RightTopLin.NcToPlc.CoupleState=3
+		AND LeftBottomLin.NcToPlc.CoupleState=1 AND RightBottomLin.NcToPlc.CoupleState=3 THEN
+		CoupleState:=1;
+	ELSIF LeftTopLin.NcToPlc.CoupleState=0 AND RightTopLin.NcToPlc.CoupleState=0
+		AND LeftBottomLin.NcToPlc.CoupleState=0 AND RightBottomLin.NcToPlc.CoupleState=0 THEN
+		CoupleState:=0;
+	ELSE
+		CoupleState:=-100;
+		Error:=TRUE;
+		ErrorID:=-100;
+		FB_PlcEmergencyStop();
+	END_IF
+END_IF
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_CheckCoupleStatus">
+      <LineId Id="22" Count="15" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

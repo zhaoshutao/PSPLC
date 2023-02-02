@@ -1,0 +1,410 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.6">
+  <GVL Name="Global_Variables" Id="{bcaa4f18-97b1-4818-bac8-1835e8da9e31}">
+    <Declaration><![CDATA[//{attribute 'Tc2GvlVarNames'}
+VAR_GLOBAL
+(*IDControl Ready*)
+	IDControlReady:BOOL;
+(*Error Massage*)
+	Error:BOOL;
+	ErrorID:DINT;
+	ErrorDescription:STRING;
+(*加载配方参数*)
+	LoadRecipeParameters:BOOL;
+	loadParametersDone:BOOL;
+(*设置光栅bias done *)	
+	PositionBiasDone:BOOL;
+(*回程差*)
+	HysteresisError:LREAL;
+(*Drive Status*)
+	DriveStatus:DINT;//1:Drive Ready;2:Axis is in operation;0:Others
+(*光栅漂移误差阈值*)
+	LEDriftErrorThreshold:LREAL:=0.001;
+(*Lag Distance threshold*)
+	PosDiff_LeftTopLin: LREAL:=0.5;
+	PosDiff_RightTopLin:LREAL:=0.5;
+	PosDiff_LeftBottomLin:LREAL:=0.5;
+	PosDiff_RightBottomLin:LREAL:=0.5;
+(*UserMode Threshold*)
+	Threshold_UserTopPos: LREAL:=0.5;
+	Threshold_UserBottomPos: LREAL:=0.5;
+	Threshold_UserLeftPos: LREAL:=0.5;
+	Threshold_UserRightPos: LREAL:=0.5;
+	Threshold_UserTopVelo: LREAL:=0.5;
+	Threshold_UserBottomVelo: LREAL:=0.5;
+	Threshold_UserLeftVelo: LREAL:=0.5;
+	Threshold_UserRightVelo: LREAL:=0.5;
+	//
+	Range_UserTaperPos:LREAL:=4.01;
+	Range_UserTaperVelo:LREAL:=1.01;
+	//Diff_TaperLeftPos:LREAL:=0.01;
+	//Diff_TaperLeftVelo:LREAL:=0.2;
+	//Diff_TaperRightPos:LREAL:=0.05;
+	//Diff_TaperRightVelo:LREAL:=0.5;
+	//Taper_BeyondRangePositive:BOOL;
+	//Diff_TaperTopPos:LREAL:=0.05;
+	//Diff_TaperBottomPos:LREAL:=0.05;
+	//Taper_BeyondRangeNegtive:BOOL;
+(*BCGap Threshold*)
+	Threshold_BCTopPos: LREAL:=0.5;
+	Threshold_BCBottomPos: LREAL:=0.5;
+	Threshold_BCLeftPos: LREAL:=0.5;
+	Threshold_BCRightPos: LREAL:=0.5;
+	Threshold_BCTopVelo: LREAL:=0.5;
+	Threshold_BCBottomVelo: LREAL:=0.5;
+	Threshold_BCLeftVelo: LREAL:=0.5;
+	Threshold_BCRightVelo: LREAL:=0.5;
+(*DebugMode Threshold*)
+	Threshold_TopPos_Debug: LREAL:=4;
+	Threshold_BottomPos_Debug: LREAL:=4;
+	Threshold_LeftPos_Debug: LREAL:=4;
+	Threshold_RightPos_Debug: LREAL:=4;
+(*Taper Mode Threshold*)
+	Range_TaperPos:LREAL:=5.01;
+	Range_TaperVelo:LREAL:=1.01;
+	Threshold_TaperLeftPos:LREAL:=0.01;
+	Threshold_TaperLeftVelo:LREAL:=0.2;
+	Threshold_TaperRightPos:LREAL:=0.05;
+	Threshold_TaperRightVelo:LREAL:=0.5;
+	Taper_BeyondRangePositive:BOOL;
+	Threshold_TaperTopPos:LREAL:=0.05;
+	Threshold_TaperBottomPos:LREAL:=0.05;
+	Taper_BeyondRangeNegtive:BOOL;
+(*SingleCarrierMode threshold*)
+	Threshold_TopPos_SingleCarrier: LREAL:=2;
+	Threshold_BottomPos_SingleCarrier: LREAL:=2;
+	Threshold_LeftPos_SingleCarrier: LREAL:=2;
+	Threshold_RightPos_SingleCarrier: LREAL:=2;
+	Threshold_TopVelo_SingleCarrier: LREAL:=2;
+	Threshold_BottomVelo_SingleCarrier: LREAL:=2;
+	Threshold_LeftVelo_SingleCarrier: LREAL:=2;
+	Threshold_RightVelo_SingleCarrier: LREAL:=2;
+(*Compensation Value*)
+	M_Compensation:ARRAY[1..18] OF Struct_M_Compensation
+:=[
+(Encoder:=0,	LeftTop:=0,	RightTop:=0,		LeftBottom:=0,	RightBottom:=0,	InRange:=FALSE),
+(Encoder:=5.5,	LeftTop:=5.5,	RightTop:=5.5,	LeftBottom:=5.5,	RightBottom:=5.5,	InRange:=FALSE),
+(Encoder:=6.0,	LeftTop:=6.0,	RightTop:=6.0,	LeftBottom:=6.0,	RightBottom:=6.0,	InRange:=FALSE),
+(Encoder:=6.5,	LeftTop:=6.5,	RightTop:=6.5,	LeftBottom:=6.5,	RightBottom:=6.5,	InRange:=FALSE),
+(Encoder:=7.5,	LeftTop:=7.5,	RightTop:=7.5,	LeftBottom:=7.5,	RightBottom:=7.5,	InRange:=FALSE),
+(Encoder:=8.5,	LeftTop:=8.5,	RightTop:=8.5,	LeftBottom:=8.5,	RightBottom:=8.5,	InRange:=FALSE),
+(Encoder:=9.5,	LeftTop:=9.5,	RightTop:=9.5,	LeftBottom:=9.5,	RightBottom:=9.5,	InRange:=FALSE),
+(Encoder:=10.5,	LeftTop:=10.5,	RightTop:=10.5,	LeftBottom:=10.5,	RightBottom:=10.5,		InRange:=FALSE),
+(Encoder:=11.5,	LeftTop:=11.5,	RightTop:=11.5,	LeftBottom:=11.5,	RightBottom:=11.5,		InRange:=FALSE),
+(Encoder:=30.0,	LeftTop:=30.0,	RightTop:=30.0,	LeftBottom:=30.0,	RightBottom:=30.0,		InRange:=FALSE),
+(Encoder:=100.0,	LeftTop:=100.0,	RightTop:=100.0,	LeftBottom:=100.0,	RightBottom:=100.0,		InRange:=FALSE),
+(Encoder:=110.0,	LeftTop:=110.0,	RightTop:=110.0,	LeftBottom:=110.0,	RightBottom:=110.0,		InRange:=FALSE),
+(Encoder:=120.0,	LeftTop:=120.0,	RightTop:=120.0,	LeftBottom:=120.0,	RightBottom:=120.0,		InRange:=FALSE),
+(Encoder:=130.0,	LeftTop:=130.0,	RightTop:=130.0,	LeftBottom:=130.0,	RightBottom:=130.0,		InRange:=FALSE),
+(Encoder:=140.0,	LeftTop:=140.0,	RightTop:=140.0,	LeftBottom:=140.0,	RightBottom:=140.0,		InRange:=FALSE),
+(Encoder:=150.0,	LeftTop:=150.0,	RightTop:=150.0,	LeftBottom:=150.0,	RightBottom:=150.0,		InRange:=FALSE),
+(Encoder:=160.0,	LeftTop:=160.0,	RightTop:=160.0,	LeftBottom:=160.0,	RightBottom:=160.0,		InRange:=FALSE),
+(Encoder:=3000.001,	LeftTop:=3000.001,	RightTop:=3000.001,		LeftBottom:=3000.001,	RightBottom:=3000.001,	InRange:=FALSE)];
+
+(*simulation OR NOT*)
+	simulation:BOOL;
+(*USELinearEncoeder*)
+	USELinearEncoder:BOOL:=TRUE;
+(*restartTwinCAT*)
+	m_restartTC:BOOL;
+(*Plc_EmergencyStop *)
+	Plc_EmergencyStop  AT %Q*:BOOL:=TRUE;
+(*硬急停*)
+	Hardware_EmergencyStop :BOOL:=TRUE;
+(*LED*)
+	Led_Run  AT %Q*:BOOL;
+	Led_Error  AT %Q*:BOOL;
+(*LimitSwitch*)
+	LS_LeftTop_Top  :BOOL;
+	LS_LeftTop_Bottom  :BOOL;
+	LS_RightTop_Top  :BOOL;
+	LS_RightTop_Bottom  :BOOL;
+	LS_LeftBottom_Top  :BOOL;
+	LS_LeftBottom_Bottom  :BOOL;
+	LS_RightBottom_Top :BOOL;
+	LS_RightBottom_Bottom  :BOOL;
+	Unreach_LS_Top:BOOL;
+	Unreach_LS_Bottom:BOOL;
+(*kill switch*)
+	KS_LeftTop_Far_Contact1:BOOL;
+	KS_LeftTop_Far_Contact2:BOOL;
+	KS_RightTop_Far_Contact1:BOOL;
+	KS_RightTop_Far_Contact2:BOOL;
+	KS_LeftBottom_Far_Contact1:BOOL;
+	KS_LeftBottom_Far_Contact2:BOOL;
+	KS_RightBottom_Far_Contact1:BOOL;
+	KS_RightBottom_Far_Contact2:BOOL;
+	
+	KS_LeftTop_Near_Contact1:BOOL;
+	KS_LeftTop_Near_Contact2:BOOL;
+	KS_RightTop_Near_Contact1:BOOL;
+	KS_RightTop_Near_Contact2:BOOL;
+	KS_LeftBottom_Near_Contact1:BOOL;
+	KS_LeftBottom_Near_Contact2:BOOL;
+	KS_RightBottom_Near_Contact1:BOOL;
+	KS_RightBottom_Near_Contact2:BOOL;
+(*E-STOP*)
+	KS_CabinetEmergency_contact1:BOOL;
+	KS_CabinetEmergency_contact2:BOOL;
+	KS_handEmergency1_Contact1:BOOL;
+	KS_handEmergency1_Contact2:BOOL;
+	KS_handEmergency2_Contact1:BOOL;
+	KS_handEmergency2_Contact2:BOOL;
+	KS_softEmergency2_Contact:BOOL;
+(*aixs_ref*)
+	LeftTopLin: axis_ref;
+	RightTopLin:axis_ref;
+	LeftBottomLin:axis_ref;
+	RightBottomLin:axis_ref;
+(*axis Position*)
+	Pos_LeftTopLin: LREAL;
+	Pos_RightTopLin:LREAL;
+	Pos_LeftBottomLin:LREAL;
+	Pos_RightBottomLin:LREAL;
+(*********)
+	LB_TestRecord:LREAL;
+	RB_TestRecord:LREAL;
+(*axis Velocity*)
+	Velo_LeftTopLin: LREAL;
+	Velo_RightTopLin:LREAL;
+	Velo_LeftBottomLin:LREAL;
+	Velo_RightBottomLin:LREAL;
+(*Lag Distance*)
+	PosDiff_LeftTopLin_actual: LREAL;
+	PosDiff_RightTopLin_actual:LREAL;
+	PosDiff_LeftBottomLin_actual:LREAL;
+	PosDiff_RightBottomLin_actual:LREAL;
+(********************Gap Mode*************************)
+(**)
+	GapPositionActual:LREAL;
+	GapVelocityActual:LREAL;
+	GapMoveIndicator:DINT:=0;
+	(*1=OPEN;0=NOTMOVE;-1=CLOSE*)
+(******************Taper Mode**************************)
+(*Taper*)
+	TaperPositionActual:LREAL;
+	TaperVelocityActual:LREAL;
+	TaperMoveIndicator:DINT:=0;
+	(*1=OPEN;0=NOTMOVE;-1=CLOSE*)
+(*****************singleCarrier Mode*******************************)
+(**)
+	TopPositionActual:LREAL;
+	TopVelocityActual:LREAL;
+	BottomPositionActual:LREAL;
+	BottomVelocityActual:LREAL;
+	TopMoveIndicator:DINT:=0;
+	(*1=OPEN;0=NOTMOVE;-1=CLOSE*)
+	BottomMoveIndicator:DINT:=0;
+	(*1=OPEN;0=NOTMOVE;-1=CLOSE*)
+(******************DebugMode & BCGapMode*****************************)
+	LeftTopLinMoveIndicator:DINT:=0;
+	(*1=OPEN;0=NOTMOVE;-1=CLOSE*)
+	LeftBottomLinMoveIndicator:DINT:=0;
+	(*1=OPEN;0=NOTMOVE;-1=CLOSE*)
+	RightTopLinMoveIndicator:DINT:=0;
+	(*1=OPEN;0=NOTMOVE;-1=CLOSE*)
+	RightBottomLinMoveIndicator:DINT:=0;
+	(*1=OPEN;0=NOTMOVE;-1=CLOSE*)
+(******************Gap&SingleCarrier***********************************)
+	Diff_TopPos_actual: LREAL;
+	Diff_BottomPos_actual: LREAL;
+	Diff_LeftPos_actual: LREAL;
+	Diff_RightPos_actual: LREAL;
+	Diff_TopVelo_actual:  LREAL;
+	Diff_BottomVelo_actual: LREAL;
+	Diff_LeftVelo_actual: LREAL;
+	Diff_RightVelo_actual:  LREAL;
+
+(******************BCGap Mode***********************************)
+	Diff_BCTopPos_actual: LREAL;
+	Diff_BCBottomPos_actual: LREAL;
+	Diff_BCLeftPos_actual: LREAL;
+	Diff_BCRightPos_actual: LREAL;
+	Diff_BCTopVelo_actual:  LREAL;
+	Diff_BCBottomVelo_actual: LREAL;
+	Diff_BCLeftVelo_actual: LREAL;
+	Diff_BCRightVelo_actual:  LREAL;
+(******************UserMode*********************)
+	Diff_UserTopPos_actual: LREAL;
+	Diff_UserBottomPos_actual: LREAL;
+	Diff_UserLeftPos_actual: LREAL;
+	Diff_UserRightPos_actual: LREAL;
+	Diff_UserTopVelo_actual:  LREAL;
+	Diff_UserBottomVelo_actual: LREAL;
+	Diff_UserLeftVelo_actual: LREAL;
+	Diff_UserRightVelo_actual:  LREAL;
+	TaperOrNot:BOOL;
+	UserTaperPositionActual:LREAL;
+	UserTaperVelocityActual:LREAL;
+(***********************Power status and couple statatus***********************)
+	st_Power:BOOL;
+	st_Couple:DINT;
+(************************FB***********************)
+	FB_Power:FB_Power;
+	FB_PlcEmergencyStop: FB_PlcEmergencyStop;
+	FB_CheckCoupleStatus:FB_CheckCoupleStatus;
+	FB_Move:FB_Move;
+	FB_Stop:FB_Stop;
+	FB_DecoupleAxis:FB_DecoupleAxis;
+	FB_CoupleAxis: FB_CoupleAxis;
+(********************²¹³¥GapÄ£Ê½£¬µ¥Öá²¹³¥Êý¾Ý************************)
+	(*ÊÇ·ñ²¹³¥*)
+	USE_SingleAxis_Compensation:BOOL:=TRUE;
+	Mdut:ARRAY[1..2] OF DUT:=
+	[(Encoder:=2.0,	LeftTop:=2.3000),
+	(Encoder:=2.0,	LeftTop:=2.3000)];
+
+
+	M_CompensationNumber:INT;
+	M_DisplayNumber:INT;
+	(*Conpensation Position Target*)
+	LeftTopLinPositionNew:LREAL;
+	LeftBottomLinPositionNew:LREAL;
+	RightTopLinPositionNew:LREAL;
+	RightBottomLinPositionNew:LREAL;
+	(*考虑到回程差后，运动到临时位置*)
+	LeftTopLinPositionNew_temporary :LREAL;
+	LeftBottomLinPositionNew_temporary:LREAL;
+	RightTopLinPositionNew_temporary:LREAL;
+	RightBottomLinPositionNew_temporary:LREAL;
+	(*Display Position*)
+	LeftTopLinPositionDisplay:LREAL;
+	LeftBottomLinPositionDisplay:LREAL;
+	RightTopLinPositionDisplay:LREAL;
+	RightBottomLinPositionDisplay:LREAL;
+	(*Display Velocity*)
+	LeftTopLinVelocityDisplay:LREAL;
+	LeftBottomLinVelocityDisplay:LREAL;
+	RightTopLinVelocityDisplay:LREAL;
+	RightBottomLinVelocityDisplay:LREAL;
+	(*temperature sensors*)
+	thermocouple AT %I*:ARRAY[1..12]OF  DINT;
+	shieldPt100  AT %I*:ARRAY[1..12]OF INT;
+	thermocouple_Celsius:ARRAY[1..12]OF  LREAL;
+	shieldPt100_Celsius  :ARRAY[1..12]OF LREAL;
+	huoer_Celsius AT %I* :ARRAY[1..3]OF INT;
+	(**)
+	lakeshorePt100  AT %I*:ARRAY[1..12]OF INT;(*16*×èÖµ*)
+	lakeshorePt100_Resistance :ARRAY[1..12]OF LREAL;(*ÉãÊÏÎÂ¶È*)
+	lakeshorePt100_Celsius  :ARRAY[1..12]OF LREAL;(*ÉãÊÏÎÂ¶È*)
+	temperatureCompensationValue:LREAL:=6;
+	testSensors  AT %I*:ARRAY[1..4]OF INT;
+
+(*Test No.184*)
+	Struct_M_lakeshore_168:ARRAY[1..52] OF Struct_M_lakeshore:=[(Temperature:=-255.02072961,	Resistance:=19394.22709513),
+														       (Temperature:=-254.05045152,	Resistance:=17654.92429047),
+														       (Temperature:=-253.07744087,	Resistance:=16151.62683151),
+														       (Temperature:=-252.00959324,	Resistance:=14730.57326945),
+														       (Temperature:=-250.42495220,	Resistance:=12968.55015283),
+														       (Temperature:=-248.82081761,	Resistance:=11509.89960915),
+														       (Temperature:=-247.21174565,	Resistance:=10296.55197911),
+														       (Temperature:=-245.58891366,	Resistance:=9270.75571767),
+														       (Temperature:=-243.96558907,	Resistance:=8400.62569432),
+														       (Temperature:=-242.14354329,	Resistance:=7573.26483503),
+														       (Temperature:=-240.02689351,	Resistance:=6767.17126789),
+														       (Temperature:=-237.01618411,	Resistance:=5838.58514549),
+														       (Temperature:=-234.00593745,	Resistance:=5101.58555065),
+														       (Temperature:=-230.99752410,	Resistance:=4505.18214539),
+														       (Temperature:=-228.00173193,	Resistance:=4017.09732257),
+														       (Temperature:=-224.99947745,	Resistance:=3609.02040601),
+														       (Temperature:=-223.00692641,	Resistance:=3374.28026471),
+														       (Temperature:=-218.01660226,	Resistance:=2884.61719537),
+														       (Temperature:=-213.02574325,	Resistance:=2501.58514940),
+														       (Temperature:=-208.03560884,	Resistance:=2195.64012040),
+														       (Temperature:=-203.04420176,	Resistance:=1946.81103230),
+														       (Temperature:=-198.05275449,	Resistance:=1741.06206884),
+														       (Temperature:=-193.06103279,	Resistance:=1568.92560629),
+														       (Temperature:=-188.06248282,	Resistance:=1422.92395120),
+														       (Temperature:=-183.06714354,	Resistance:=1298.17958491),
+														       (Temperature:=-178.06870827,	Resistance:=1190.47468069),
+														       (Temperature:=-173.07068956,	Resistance:=1096.60468916),
+														       (Temperature:=-163.08053594,	Resistance:=942.07281950),
+														       (Temperature:=-153.08718985,	Resistance:=820.42837839),
+														       (Temperature:=-143.08487641,	Resistance:=722.56760466),
+														       (Temperature:=-133.08398781,	Resistance:=642.67848926),
+														       (Temperature:=-123.08745222,	Resistance:=576.45895597),
+														       (Temperature:=-113.09120089,	Resistance:=520.90762376),
+														       (Temperature:=-103.09942915,	Resistance:=473.74837218),
+														       (Temperature:=-93.10598968,		Resistance:=433.38294834),
+														       (Temperature:=-83.10392915,		Resistance:=398.41968464),
+														       (Temperature:=-73.10228709,		Resistance:=368.09301028),
+														       (Temperature:=-63.10299621,		Resistance:=341.43424414),
+														       (Temperature:=-53.11519681,		Resistance:=318.02847824),
+														       (Temperature:=-43.10742807	,	Resistance:=297.22485607),
+														       (Temperature:=-33.10726812,		Resistance:=278.69871028),
+														       (Temperature:=-23.11858134,		Resistance:=262.15834948),
+														       (Temperature:=-13.10195090,		Resistance:=247.23616978),
+														       (Temperature:=-3.11184252,		Resistance:=233.79708047),
+														       (Temperature:=6.89903472,		Resistance:=221.61300733),
+														       (Temperature:=16.89346621,		Resistance:=210.54967929),
+														       (Temperature:=26.90358952,		Resistance:=200.45587628),
+														       (Temperature:=36.88287604,		Resistance:=191.25204791),
+														       (Temperature:=41.88872196,		Resistance:=186.92616816),
+														       (Temperature:=46.88480694,		Resistance:=182.78432099),
+														       (Temperature:=52.87776550,		Resistance:=178.06184409),
+														       (Temperature:=56.87370113,		Resistance:=175.01081354)];
+
+(*
+Struct_M_lakeshore_168:ARRAY[1..52] OF Struct_M_lakeshore:=(Temperature:=-255.02148584,	Resistance:=17467.51361429),
+														       (Temperature:=-254.05229765,	Resistance:=15920.82205731),
+														       (Temperature:=-253.07582822,	Resistance:=14578.50586503),
+														       (Temperature:=-252.01029408,	Resistance:=13314.83293750),
+														       (Temperature:=-250.42593953,	Resistance:=11741.46150061),
+														       (Temperature:=-248.82114671,	Resistance:=10435.92048251),
+														       (Temperature:=-247.21093179,	Resistance:=9348.73725539),
+														       (Temperature:=-245.58869114,	Resistance:=8428.36508630),
+														       (Temperature:=-243.96317077,	Resistance:=7645.95382882),
+														       (Temperature:=-242.14282659,	Resistance:=6901.52980185),
+														       (Temperature:=-240.02565306,	Resistance:=6174.70288700),
+														       (Temperature:=-237.01772619,	Resistance:=5337.15935418),
+														       (Temperature:=-234.00641032,	Resistance:=4669.94432605),
+														       (Temperature:=-230.99638631,	Resistance:=4129.44762482),
+														       (Temperature:=-228.00091359,	Resistance:=3686.25091590),
+														       (Temperature:=-225.00020456,	Resistance:=3315.69773718),
+														       (Temperature:=-223.00791577,	Resistance:=3102.03825436),
+														       (Temperature:=-218.01784455,	Resistance:=2655.95765650),
+														       (Temperature:=-213.02820409,	Resistance:=2306.30469335),
+														       (Temperature:=-208.03707086,	Resistance:=2026.68631979),
+														       (Temperature:=-203.04413996,	Resistance:=1798.75031171),
+														       (Temperature:=-198.05551086,	Resistance:=1610.35975891),
+														       (Temperature:=-193.06273927,	Resistance:=1452.39526661),
+														       (Temperature:=-188.05883288,	Resistance:=1318.25592597),
+														       (Temperature:=-183.06258538,	Resistance:=1203.56234118),
+														       (Temperature:=-178.06718279,	Resistance:=1104.51148216),
+														       (Temperature:=-173.07249199,	Resistance:=1018.20332165),
+														       (Temperature:=-163.08375191,	Resistance:=875.68114167),
+														       (Temperature:=-153.08708895,	Resistance:=763.40014611),
+														       (Temperature:=-143.08456026,	Resistance:=673.01413079),
+														       (Temperature:=-133.08511977,	Resistance:=599.14558137),
+														       (Temperature:=-123.08749266,	Resistance:=537.87435730),
+														       (Temperature:=-113.09351200,	Resistance:=486.39730699),
+														       (Temperature:=-103.10083499,	Resistance:=442.70701049),
+														       (Temperature:=-93.10681179,		Resistance:=405.24490154),
+														       (Temperature:=-83.10668364,		Resistance:=372.85251196),
+														       (Temperature:=-73.10424427,		Resistance:=344.62377216),
+														       (Temperature:=-63.10525050,		Resistance:=319.91272482),
+														       (Temperature:=-53.11631884,		Resistance:=298.14326645),
+														       (Temperature:=-43.10919062	,	Resistance:=278.79776489),
+														       (Temperature:=-33.10718139,		Resistance:=261.57224548),
+														       (Temperature:=-23.12143823,		Resistance:=246.17864217),
+														       (Temperature:=-13.10564070,		Resistance:=232.27707124),
+														       (Temperature:=-3.11271856,		Resistance:=219.77787693),
+														       (Temperature:=6.89876028,		Resistance:=208.41568062),
+														       (Temperature:=16.88935188,		Resistance:=198.10158580),
+														       (Temperature:=26.89992337,		Resistance:=188.70405160),
+														       (Temperature:=36.88110394,		Resistance:=180.10572832),
+														       (Temperature:=41.88616228,		Resistance:=176.08361784),
+														       (Temperature:=46.88372409,		Resistance:=172.21346348),
+														       (Temperature:=52.87452959,		Resistance:=167.80352164),
+														       (Temperature:=56.87233822,		Resistance:=164.96790544);
+*)
+
+(******RS232************)
+	RxBufferEL			: ComBuffer;	(* Receive data buffer; used with all receive function blocks *)
+	TxBufferEL			: ComBuffer;	(* Transmit data buffer; used with all receive function blocks *)
+
+END_VAR
+
+]]></Declaration>
+  </GVL>
+</TcPlcObject>

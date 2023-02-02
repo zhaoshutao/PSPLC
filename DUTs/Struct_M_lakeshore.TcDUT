@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.6">
+  <DUT Name="Struct_M_lakeshore" Id="{c89bef22-063c-4729-ae7c-eeb6c5f9a7b4}">
+    <Declaration><![CDATA[TYPE Struct_M_lakeshore :
+STRUCT
+	Temperature:LREAL;(*Celsius*)
+	Resistance:LREAL;
+END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

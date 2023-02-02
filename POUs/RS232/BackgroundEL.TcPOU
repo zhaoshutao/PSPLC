@@ -1,0 +1,112 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.6">
+  <POU Name="BackgroundEL" Id="{13f21367-14a7-4479-90f6-31bf3933bb14}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM BackgroundEL
+VAR
+	fbEL6001Ctrl		: SerialLineControl;
+	bEL6001CtrlError	: BOOL;
+	eEL6001CtrlErrorID	: ComError_t;
+	(* 	I/O variables for a EL6001 terminal*)
+	stIn_EL6001 AT %I*	: KL6inData22B;	(* linked to the EL6001 in the TwinCAT System Manager *)
+	stOut_EL6001 AT %Q*	: KL6outData22B;(* linked to the EL6001 in the TwinCAT System Manager *)
+
+	Timer		: TON := (PT:=T#0.025S);
+	bSendBusy	: BOOL;
+	eSendErrorID: ComError_t;
+
+	fbReceive		: ReceiveString;
+	sReceivedString	: STRING;
+	sLastReceivedString: STRING;
+	bStringReceived	: BOOL;
+	bReceiveBusy	: BOOL;
+	bReceiveError	: BOOL;
+	eReceiveErrorID	: ComError_t;
+	bReceiveTimeout	: BOOL;
+	nReceiveCounter	: UDINT;
+	sendErrorStatus: BOOL;
+	RcvErrorStatus: BOOL;
+	SendPreparedToString: STRING:='M0,0\r';
+
+	arr_SendData : ARRAY [1..20] OF BYTE:=[16#4D, 16#30, 16#2C, 16#30, 16#0D];(*READ*)
+	fb_Send: SendData;
+
+	gap_left: LREAL;
+	gap_right: LREAL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(*
+The SerialLineControl function block is supposed to be called in every PLC cycle.
+It communicates with the serial line hardware device and transmits or receives data.
+The SerialLineControl can be called in the standard task (e.g.for PcCOM port usage) 
+or in a separate fast task (e.g.for terminal usage) as well.
+A fast separate task will be necessary at high baud rates or with KL6001 terminals 
+which have a small process image (3 or 5 data bytes only)
+*)
+
+(* background communication with the EL6001 terminal *)
+fbEL6001Ctrl(
+	Mode:= SERIALLINEMODE_KL6_22B_STANDARD,
+	pComIn:= ADR(stIn_EL6001),
+	pComOut:= ADR(stOut_EL6001),
+	SizeComIn:= SIZEOF(stIn_EL6001),
+	Error=> ,
+	ErrorID=> ,
+	TxBuffer:= TxBufferEL,
+	RxBuffer:= RxBufferEL );
+IF fbEL6001Ctrl.Error THEN
+	bEL6001CtrlError := TRUE;
+	eEL6001CtrlErrorID := fbEL6001Ctrl.ErrorID;
+END_IF
+
+(* Call the send block every second TO REPEAT the transmission.
+// Also call the block as long as it is busy to finish a transmission.*)
+Timer(IN:=TRUE);
+IF Timer.Q OR fb_Send.Busy THEN
+	Timer(IN:=FALSE); (* reset timer *)
+	sendErrorStatus:=FALSE;
+	fb_Send(		pSendData:=ADR(arr_SendData[1]) ,
+			Length:=5 ,
+			TXbuffer:=TxBufferEL ,
+			Busy=>bSendBusy ,
+			Error=> );
+	IF fb_Send.Error <> COMERROR_NOERROR THEN
+		sendErrorStatus:=TRUE;
+		eSendErrorID := fb_Send.Error;
+	END_IF
+END_IF
+
+(*//	Receive string data:
+//	The block receives any data strings beginning with a STX ($02) and ending with an ETX ($03) character.	*)
+fbReceive(
+	(*Prefix:= 'M0,',
+	Suffix:= '$R',*)
+	Prefix:= ,
+	Suffix:= ,
+	Timeout:= T#0.025s,
+	ReceivedString:= sReceivedString,
+	RXbuffer:= RxBufferEL,
+	StringReceived=> bStringReceived,
+	Busy=> bReceiveBusy,
+	Error=> ,
+	RxTimeout=> bReceiveTimeout );
+IF fbReceive.Error <> COMERROR_NOERROR THEN
+	RcvErrorStatus:=TRUE;
+	eReceiveErrorID := fbReceive.Error;
+ELSE
+		RcvErrorStatus:=FALSE;
+END_IF
+IF bStringReceived THEN
+	nReceiveCounter := nReceiveCounter + 1;
+	sLastReceivedString := sReceivedString;
+END_IF
+IF LEN(sLastReceivedString)>=22 THEN
+	gap_left:=STRING_TO_LREAL(MID(sLastReceivedString, 9, 4));
+	gap_right:=STRING_TO_LREAL(MID(sLastReceivedString, 9, 14));
+END_IF
+]]></ST>
+    </Implementation>
+    <LineIds Name="BackgroundEL">
+      <LineId Id="32" Count="69" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.6">
+  <POU Name="FB_LedShow" Id="{18e4c288-3d16-46ba-b7ee-e99ba52b271b}" SpecialFunc="None">
+    <Declaration><![CDATA[(****************************************************************
+NAME:			FB_LedShow
+DATA:			2017.2.16
+VERSION:		1.0.0
+DESCRIPTION:	FB_LedShow
+HISTORY:
+				2017.2.16 	NEW
+
+***************************************************************)
+FUNCTION_BLOCK FB_LedShow
+VAR_INPUT
+	Error:BOOL;
+	Run:BOOL;
+END_VAR
+VAR_OUTPUT
+	LedStatus:DINT;
+END_VAR
+VAR
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF Run THEN
+	Led_Run:=TRUE;
+	Led_Error:=FALSE;
+	LedStatus:=1;
+END_IF
+
+IF Error THEN
+	Led_Run:=FALSE;
+	Led_Error:=TRUE;
+	LedStatus:=0;
+END_IF
+
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_LedShow">
+      <LineId Id="19" Count="12" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

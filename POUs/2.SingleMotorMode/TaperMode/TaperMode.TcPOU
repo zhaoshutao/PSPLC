@@ -1,0 +1,355 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.6">
+  <POU Name="TaperMode" Id="{b98033c6-967b-407a-aa73-e28de9e58200}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM TaperMode
+VAR
+	(*key Command*)
+	btn_PowerOn: BOOL;
+	btn_PowerOff: BOOL;
+	TaperLargePositionNew:LREAL;
+	TaperLargePositionActual: LREAL;
+	TaperPositionNew:LREAL;
+	TaperVelocityNew:LREAL;
+	btn_TaperMove:BOOL;
+	btn_TaperStop:BOOL;
+	(*Var*)
+	fb_ton1:TON;
+	fb_ton2:TON;
+	(*Status*)
+	State:DINT;
+	Busy:BOOL;
+	InitDone:BOOL;
+	Error:BOOL;
+	ErrorID:DINT;
+	m_state: DINT;
+	s_state: DINT;
+	ton_t: TON;
+	range_state: DINT;
+	d_state: DINT;
+	(*¼ì²âµ½ÏÞÎ»£¬»Ö¸´Move×´Ì¬*)
+	FTrig_ReachLS: F_TRIG;
+	FTrig_btn_GapMove: F_TRIG;
+	btn_Power: BOOL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[TaperPositionActual:=((Pos_RightTopLin+Pos_RighTBottomLin)-(Pos_LeftTopLin+Pos_LeftBottomLin))/2;	(*Êµ¼ÊTaper¶È£¬Taper¶¨ÒåÎªµ¥²à*)
+TaperVelocityActual:=(Velo_RightTopLin+Velo_RightBottomLin)/2;
+TaperLargePositionActual:=TaperPositionActual+(Pos_LeftTopLin+Pos_LeftBottomLin)/2;					(*´óTaper=Taper¶È+×ó²àGap*)
+TaperLargePositionNew:=TaperPositionNew+(Pos_LeftTopLin+Pos_LeftBottomLin)/2;					(*´óTaper=Taper¶È+×ó²àGap*)
+(*********************************************************************Monitor All Carrirt Position***********************************************)
+A_MonitoringAllAxis();
+(*********************************************************************A_PosDiffDetection***********************************************)
+A_PosDiffDetection();
+(*********************************************************************btn_PowerOn************************************************************)
+IF btn_Power AND st_Power=0 THEN
+	btn_PowerOn:=TRUE;
+	btn_Power:=FALSE;
+END_IF
+IF btn_Power AND st_Power=1 THEN
+	btn_PowerOff:=TRUE;
+	btn_Power:=FALSE;
+END_IF
+(*********************************************************************btn_PowerOn************************************************************)
+IF btn_PowerOn THEN
+	A_PowerOn();
+END_IF
+(******************************************************ÉÏµç×´Ì¬£¬´¦ÓÚñîºÏ×´Ì¬£¬ESTOP***********************************************)
+IF NOT btn_PowerOff THEN
+	IF st_Power=1 AND st_Couple<>0THEN
+		Error:=TRUE;
+		ErrorID:=101;
+		FB_PlcEmergencyStop();
+		LED_Error:=TRUE;
+	END_IF
+END_IF
+(*********************************************************************btn_Move*****************************************************************)
+IF InitDone THEN
+	IF btn_TaperMove THEN
+		CASE m_state OF
+			0:
+				FB_Move.Mode:=3;						(*1£ºgapÄ£Ê½£»2£ºµ¥ÁºÄ£Ê½£¬3£ºtaperÄ£Ê½*)
+				FB_Move.CoupleState:=st_Couple;			(*ñîºÏ×´Ì¬ÊäÈë*)
+				FB_Move.PowerState:=st_Power;			(*µçÔ´×´Ì¬ÊäÈë*)
+				FB_Move.TaperMove:=TRUE;				(*Execute TRUE*)
+				FB_Move.TaperPosition:=TaperLargePositionNew;	(*Î»ÖÃ*)
+				FB_Move.TaperVelocity:=TaperVelocityNew;	(*ËÙ¶È*)
+				FB_Move();								(*Æô¶¯FB*)
+				m_state:=1;
+			1:
+				FB_Move();
+				IF NOT FB_Move.TaperDone THEN			(*ÔË¶¯Î´Íê³É£¬Ñ­»·*)
+					m_state:=1;
+					LED_Run:=TRUE;
+				ELSE									(*ÔË¶¯Íê³É£¬ÏÂÒ»²½*)
+					m_state:=88;
+				END_IF
+
+			88:
+				btn_TaperMove:=FALSE;					(*×´Ì¬»Ö¸´*)
+				m_state:=0;
+				LED_Run:=FALSE;
+		END_CASE
+	END_IF
+END_IF
+(*******************************************************************btn_Stop********************************************************************)
+IF btn_TaperStop THEN
+	LED_Run:=FALSE;
+	TaperMoveIndicator:=0;
+	FB_Move.TaperReset:=TRUE;							(*¸øÔË¶¯FB¸øÍ£Ö¹ÐÅºÅ£¬Ê¹FB_Move×´Ì¬»Ö¸´*)
+	FB_Move();											(*Æô¶¯FB_Move*)
+	btn_TaperMove:=FALSE;								(*btn_GapMove:=FALSE*)
+	m_state:=0;											(*m_state:=0;*)
+	CASE s_state OF
+			0:
+				FB_Stop.Mode:=3;							(*1£ºgapÄ£Ê½£»2£ºµ¥ÁºÄ£Ê½£»3£ºtaperÄ£Ê½*)
+				FB_Stop.CoupleState:=st_Couple;			(*ñîºÏ×´Ì¬ÊäÈë*)
+				FB_Stop.PowerState:=st_Power;				(*µçÔ´×´Ì¬ÊäÈë*)
+				FB_Stop.TaperStop:=TRUE;				(*Execute TRUE*)
+				FB_Stop();								(*Æô¶¯FB*)
+				s_state:=1;
+			1:
+				FB_Stop();
+				IF NOT FB_Stop.TaperDone THEN			(*Í£Ö¹Î´Íê³É£¬Ñ­»·*)
+					s_state:=1;
+				ELSE									(*Í£Ö¹Íê³É£¬ÏÂÒ»²½*)
+					s_state:=88;
+				END_IF
+			88:
+				btn_TaperStop:=FALSE;						(*»Ö¸´×´Ì¬*)
+				FB_Move.TaperReset:=FALSE;					(*ÔËÐÐFB*)
+				s_state:=0;
+		END_CASE
+
+END_IF
+(****************************TaperMoveIndicator***************************)
+IF TaperVelocityActual>0 THEN
+	TaperMoveIndicator:=1;
+ELSIF TaperVelocityActual<0 THEN
+	TaperMoveIndicator:=-1;
+ELSE
+	TaperMoveIndicator:=0;
+END_IF
+(*********************************************************************btn_PowerOff************************************************************)
+IF btn_PowerOff THEN
+	A_PowerOff();
+END_IF
+(*********************************************************************ÏÞÎ»Åö´¥×´Ì¬»Ö¸´************************************************************)
+(*Èç¹û¼ì²âµ½ÏØÏÞÎ»¿ª¹ØÏÂ½µÑØ£¬»Ö¸´Move×´Ì¬*)
+FTrig_ReachLS(CLK:=Unreach_LS_Top AND Unreach_LS_Bottom);
+IF FTrig_ReachLS.Q THEN
+	btn_TaperStop:=TRUE;
+END_IF
+(*Èç¹û¼ì²âµ½TopÏÞÎ»¿ª¹ØFALSE£¬ÇÒÄ¿±êÎ»ÖÃ´óÓÚµ±Ç°Î»ÖÃÊ±£¬»òÕßÏà·´Ê±£¬»Ö¸´Move×´Ì¬*)
+IF NOT Unreach_LS_Top AND TaperLargePositionNew-TaperLargePositionActual>0.0005 AND btn_TaperMove THEN
+	btn_TaperStop:=TRUE;
+END_IF
+IF NOT Unreach_LS_Bottom AND TaperLargePositionNew-TaperLargePositionActual<0.0005 AND btn_TaperMove THEN
+	btn_TaperStop:=TRUE;
+END_IF]]></ST>
+    </Implementation>
+    <Action Name="A_MonitoringAllAxis" Id="{3106825b-7830-4656-89fc-ca34159ebcb4}">
+      <Implementation>
+        <ST><![CDATA[(****************************************************************
+NAME:			A_MonitoringAllAxis
+DATA:			2017.3.20
+VERSION:		1.0.0
+DESCRIPTION:	
+				Ã¿´ÎÑ­»·¾ùÖ´ÐÐÖáÎ»ÖÃºÍÖáÔË¶¯µÄ¼ì²é
+				1.4ÖáÏà¶ÔÔË¶¯¼ì²é
+				2.4Öá¹âÕ¤³ßÎ»ÖÃ¡¢ËÙ¶È¶Ô±È¼ì²é
+				3.Ã¿Öá¹âÕ¤ºÍ±àÂëÆ÷Î»ÖÃ¶Ô±È¼ì²é
+HISTORY:
+				2017.3.27		NEW
+
+***************************************************************)
+(*************************************************************************************1.4ÖáÏà¶ÔÔË¶¯¼ì²é************************************************************************************)
+(*³ýÁËÓÒÉÏºÍÓÒÏÂÖáÒ»Æð¶¯£¬ÆäÓàÖá¶¯¶¼ESTOP*)
+(*×óÉÏ¡¢×óÏÂÖá¶¯*)
+IF  LeftTopLin.Status.Moving OR LeftBottomLin.Status.Moving THEN
+	btn_TaperStop:=TRUE;
+	FB_PlcEmergencyStop();
+	Error:=TRUE;
+	ErrorID:=11;
+	LED_Error:=TRUE;
+END_IF
+(*ÓÒÉÏ¶¯¡¢ÓÒÏÂ²»¶¯£¬»òÕßÓÒÏÂ¶¯¡¢ÓÒÉÏ²»¶¯¡£ESTOP*)
+IF (RightTopLin.Status.Moving AND NOT RightBottomLin.Status.Moving) OR (NOT RightTopLin.Status.Moving AND RightBottomLin.Status.Moving) THEN
+	btn_TaperStop:=TRUE;
+	FB_PlcEmergencyStop();
+	Error:=TRUE;
+	ErrorID:=12;
+	LED_Error:=TRUE;
+END_IF
+(*************************************************************************************2.4Öá¹âÕ¤³ßÎ»ÖÃ¡¢ËÙ¶È¶Ô±È¼ì²é**********************************************************************)
+IF st_power<>0 THEN
+(*Top×óÓÒºÍBottom×óÓÒ Î»ÖÃ±È¶Ô£¬³¬³öRangeÊ±£¬µç»úEnable_Positive=false*)
+IF (Pos_RightTopLin-Pos_leftTopLin>Range_TaperPos/2) OR (Pos_RightBottomLin-Pos_leftBottomLin>Range_TaperPos/2) THEN
+	Taper_BeyondRangePositive:=TRUE;
+ELSE
+	Taper_BeyondRangePositive:=FALSE;
+END_IF
+(*TopÓÒÐ¡ÓÚ×óºÍBottomÓÒÐ¡ÓÚ×ó£¬ Î»ÖÃ±È¶Ô£¬³¬³öDiffÊ±£¬µç»úEnable_Negtive=false*)
+IF  (Pos_leftTopLin-Pos_RightTopLin>Threshold_TaperTopPos) OR (Pos_leftBottomLin-Pos_RightBottomLin>Threshold_TaperBottomPos) THEN
+	Taper_BeyondRangeNegtive:=TRUE;
+ELSE
+	Taper_BeyondRangeNegtive:=FALSE;
+END_IF
+(*×óÖáÉÏÏÂÎ»ÖÃËÙ¶È¶Ô±È£¬³¬³öESTOP*)
+IF ABS(Pos_LeftTopLin-Pos_LeftBottomLin)>Threshold_TaperLeftPos  THEN
+	btn_TaperStop:=TRUE;
+	FB_PlcEmergencyStop();
+	Error:=TRUE;
+	ErrorID:=13;
+	LED_Error:=TRUE;
+ELSIF  ABS(Velo_leftTopLin-Velo_LeftBottomLin)>Threshold_TaperLeftVelo THEN
+	(*btn_TaperStop:=TRUE;
+	FB_PlcEmergencyStop();*)
+	Error:=TRUE;
+	ErrorID:=14;
+END_IF
+(*ÓÒÖáÉÏÏÂÎ»ÖÃËÙ¶È¶Ô±È£¬³¬³öESTOP*)
+IF ABS(Pos_RightTopLin-Pos_RightBottomLin)>Threshold_TaperRightPos  THEN
+	btn_TaperStop:=TRUE;
+	FB_PlcEmergencyStop();
+	Error:=TRUE;
+	ErrorID:=15;
+	LED_Error:=TRUE;
+ELSIF  ABS(Velo_RightTopLin-Velo_RightBottomLin)>Threshold_TaperRightVelo THEN
+	(*btn_TaperStop:=TRUE;
+	FB_PlcEmergencyStop();*)
+	Error:=TRUE;
+	ErrorID:=16;
+END_IF
+END_IF
+(*********************************************************************************3.Ã¿Öá¹âÕ¤ºÍ±àÂëÆ÷Î»ÖÃ¶Ô±È¼ì²é**********************************************************************)]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="A_PosDiffDetection" Id="{b1c92812-9cf8-4972-bbd1-5cdd86c2d830}">
+      <Implementation>
+        <ST><![CDATA[IF ABS(PosDiff_LeftTopLin_actual-PosDiff_RightTopLin_actual)>0.2 THEN
+	ErrorID:=51;
+	Error:=TRUE;
+	btn_TaperStop:=TRUE;
+	FB_PlcEmergencyStop();
+	LED_Error:=TRUE;
+ELSIF ABS(PosDiff_LeftBottomLin_actual-PosDiff_RightBottomLin_actual)>0.2 THEN
+	ErrorID:=53;
+	Error:=TRUE;
+	btn_TaperStop:=TRUE;
+	FB_PlcEmergencyStop();
+	LED_Error:=TRUE;
+END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="A_PowerOff" Id="{372c74eb-af7b-42c0-9bab-90aab509cf1a}">
+      <Implementation>
+        <ST><![CDATA[CASE d_state OF
+		0:(*PowerOff*)
+			FB_Power(Off:=TRUE);
+				d_state:=1;
+		1:
+			IF NOT FB_power.OffStatus THEN
+				d_state:=1;
+			ELSE
+				d_state:=88;
+			END_IF
+		88:(*ResetAllState*)
+			btn_PowerOn:=FALSE;
+			btn_TaperMove:=FALSE;
+			btn_TaperStop:=FALSE;
+			fb_ton1.IN:=FALSE;
+			fb_ton2.IN:=FALSE;
+			ton_t.IN:=FALSE;
+			State:=0;
+			Busy:=FALSE;
+			InitDone:=FALSE;
+			Error:=FALSE;
+			ErrorID:=0;
+			m_state:=0;
+			s_state:=0;
+			btn_PowerOff:=FALSE;
+			d_state:=0;
+			LED_Error:=FALSE;
+			LED_Run:=FALSE;
+END_CASE]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="A_powerOn" Id="{73246b12-3eb1-4b3f-84e8-7efd6ecb39f8}">
+      <Implementation>
+        <ST><![CDATA[(****************************************************************
+NAME:			A_SetAxisPositionAndPowerOn
+DATA:			2017.3.27
+VERSION:		1.0.0
+DESCRIPTION:	
+				ÉÏµãÃüÁîºó£¬Ë³ÐòÖ´ÐÐ£º
+				1.FB_SetAxisPosition
+				2.FB_PowerOn
+				·µ»ØÖ´ÐÐÊÇ·ñ³É¹¦
+HISTORY:
+				2017.3.27		NEW
+				2017.5.8		É¾³ýÁËsetAxisPosition£¬ÒÆ¶¯µ½MAIN³ÌÐòÖÐ
+							±ä¸üNAMEÎªA_PowerOn
+
+***************************************************************)
+fb_ton2(PT:=t#0.5s);
+CASE State OF
+	0:	(*FB_Power_On*)
+		FB_Power(On:=TRUE);
+		fb_ton2.IN:=TRUE;
+		State:=1;
+	1:	(*wait*)
+		FB_power();
+		IF NOT FB_power.OnStatus THEN		(*FB_Power_OnÃ»ÓÐÖ´ÐÐÍê£¬wait£¬³¬Ê±FB Error*)
+			IF NOT fb_ton2.Q THEN
+				State:=1;
+			ELSE
+				ErrorID:=1;
+				State:=99;
+			END_IF
+		ELSE
+			State:=88;
+		END_IF
+	88:	(*All Done*)
+		btn_PowerOn:=FALSE;
+		State:=0;
+		Error:=FALSE;
+		ErrorID:=0;
+		Busy:=FALSE;
+		InitDone:=TRUE;
+		FB_power.On:=FALSE;
+		fb_ton1.IN:=FALSE;
+		fb_ton2.IN:=FALSE;
+	99:
+		btn_PowerOn:=FALSE;
+		State:=99;
+		Error:=TRUE;
+		Busy:=FALSE;
+		InitDone:=FALSE;
+		FB_Power.On:=FALSE;
+		fb_ton1.IN:=FALSE;
+		fb_ton2.IN:=FALSE;
+		LED_Error:=TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Action>
+    <LineIds Name="TaperMode">
+      <LineId Id="29" Count="7" />
+      <LineId Id="163" Count="7" />
+      <LineId Id="162" Count="0" />
+      <LineId Id="37" Count="96" />
+    </LineIds>
+    <LineIds Name="TaperMode.A_MonitoringAllAxis">
+      <LineId Id="0" Count="72" />
+    </LineIds>
+    <LineIds Name="TaperMode.A_PosDiffDetection">
+      <LineId Id="0" Count="13" />
+    </LineIds>
+    <LineIds Name="TaperMode.A_PowerOff">
+      <LineId Id="0" Count="28" />
+    </LineIds>
+    <LineIds Name="TaperMode.A_powerOn">
+      <LineId Id="0" Count="53" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

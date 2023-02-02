@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.6">
+  <DUT Name="Struct_M_Compensation" Id="{4455acd1-7e5f-42cb-a8f4-5bfb823adf26}">
+    <Declaration><![CDATA[TYPE Struct_M_Compensation :
+STRUCT
+	Encoder:LREAL;
+	LeftTop:LREAL;
+	RightTop:LREAL;
+	LeftBottom:LREAL;
+	RightBottom:LREAL;
+	InRange:BOOL;
+END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>
