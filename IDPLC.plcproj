@@ -18,9 +18,6 @@
     <Released>false</Released>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="DUTs\DUT.TcDUT">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="DUTs\DUT_SENSOR_DATAS_1.TcDUT">
       <SubType>Code</SubType>
     </Compile>
@@ -48,9 +45,6 @@
     <Compile Include="DUTs\Struct_M_Compensation.TcDUT">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DUTs\Struct_M_lakeshore.TcDUT">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="GVLs\Global_Variables.TcGVL">
       <SubType>Code</SubType>
     </Compile>
@@ -66,31 +60,10 @@
     <Compile Include="POUs\0.UserMode\UserMode.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\1.CarrierMode\GapMode\BCGapMode.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="POUs\1.CarrierMode\GapMode\GapMode.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="POUs\1.CarrierMode\SingleCarrierMode\SingleCarrierMode.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="POUs\2.SingleMotorMode\DebugMode\DebugMode.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="POUs\2.SingleMotorMode\TaperMode\TaperMode.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\CommonFB\ExternFB\FB_LedShow.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\CommonFB\ExternFB\FB_PlcEmergencyStop.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="POUs\CommonFB\MainFB\FB_CoupleAxis.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="POUs\CommonFB\MainFB\FB_DecoupleAxis.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\CommonFB\MainFB\FB_Move.TcPOU">
@@ -108,9 +81,6 @@
     <Compile Include="POUs\MAIN.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\MainPRG\FB_CheckCoupleStatus.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\RS232\BackgroundEL.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -125,16 +95,9 @@
     <Folder Include="DUTs" />
     <Folder Include="GVLs" />
     <Folder Include="POUs" />
-    <Folder Include="POUs\1.CarrierMode" />
-    <Folder Include="POUs\1.CarrierMode\GapMode" />
-    <Folder Include="POUs\1.CarrierMode\SingleCarrierMode" />
-    <Folder Include="POUs\2.SingleMotorMode" />
-    <Folder Include="POUs\2.SingleMotorMode\DebugMode" />
-    <Folder Include="POUs\2.SingleMotorMode\TaperMode" />
     <Folder Include="POUs\CommonFB" />
     <Folder Include="POUs\CommonFB\ExternFB" />
     <Folder Include="POUs\CommonFB\MainFB" />
-    <Folder Include="POUs\MainPRG" />
     <Folder Include="POUs\0.UserMode" />
     <Folder Include="POUs\RS232" />
     <Folder Include="VISUs" />
