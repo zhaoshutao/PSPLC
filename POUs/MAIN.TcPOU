@@ -332,8 +332,11 @@ ELSE
 
 END_IF
 (******2.TopÏÞÎ»»òÕßBottomÏÞÎ»ÓÐÒ»¸ö´¥·¢£¬È«¾Ö±äÁ¿¡£¸øMC_POWERÓÃÓÚ·½Ïò¿ØÖÆ£¬ÓÐÒ»¸öÏÞÎ»Îª´¥·¢ÎªFALSE£¬ÔòUnreach_LSÎªFALSE******)
-Unreach_LS_Far:=LS_TopFar AND LS_BottomFar;
-Unreach_LS_Near:=LS_TopNear AND LS_BottomNear;
+//Unreach_LS_Far:=LS_TopFar AND LS_BottomFar;
+//Unreach_LS_Near:=LS_TopNear AND LS_BottomNear;
+
+Unreach_LS_Far:=LS_TopFar;
+Unreach_LS_Near:=LS_TopNear;
 ]]></ST>
       </Implementation>
     </Action>
@@ -1721,6 +1724,8 @@ END_CASE]]></ST>
       <LineId Id="120" Count="3" />
       <LineId Id="119" Count="0" />
       <LineId Id="20" Count="3" />
+      <LineId Id="125" Count="1" />
+      <LineId Id="124" Count="0" />
       <LineId Id="100" Count="0" />
     </LineIds>
     <LineIds Name="MAIN.A_GetDriverStatus">
