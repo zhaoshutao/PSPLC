@@ -106,6 +106,36 @@ VAR
 	Threshold_GapChangeFlag: LREAL;
 	Threshold_TaperChangeFlag: LREAL;
 	TaperAndGapSafetyfactor: LREAL:=1;
+	
+	//Global Chain protection
+	Global_ChainProtection_BeamLineReady:BOOL;
+	Global_ChainProtection_StorageRingReady:BOOL;
+	Global_ChainProtection_On: BOOL;
+	Global_ChainProtection_MaxGapValue: LREAL;
+	Global_ChainProtection_MoveVelocity: LREAL;
+	Global_ChainProtection_Done: BOOL;
+	//Global_ChainProtection_Error: BOOL;
+	//Global_ChainProtection_ErrorID: INT;
+	//Global_ChainProtection_ErrorDescription: STRING;
+	Global_ChainProtection_ManualOperation:BOOL:=TRUE;
+	Global_ChainProtection_FTRIG:F_TRIG;
+	Global_ChainProtection_FTRIG_Manul:F_TRIG;
+	Global_ChainProtection_TON:TON;
+	Global_ChainProtection_Triggered:BOOL;
+	Global_ChainProtection_In:BOOL;
+	Global_ChainProtection_In1 AT%I* :BOOL;//下降沿表示触发
+	Global_ChainProtection_In2 AT%I* :BOOL;
+	Global_ChainProtection_In3 AT%I* :BOOL;
+	Global_ChainProtection_In4 AT%I* :BOOL;
+	Global_ChainProtection_State:DINT;
+	Global_ChainProtection_Out1 AT%Q* :BOOL;//上升沿标识到达最大间隙，连锁保护成功
+	Global_ChainProtection_Out2 AT%Q* :BOOL;
+	Global_ChainProtection_Out3 AT%Q* :BOOL;
+	Global_ChainProtection_Out4 AT%Q* :BOOL;
+	Global_ChainProtection_TON_Stop2Move:TON;
+	Global_ChainProtection_TON_Stop2Move_InTaperMode:TON;
+	Global_ChainProtection_TON_Power2Move:TON;
+	//
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -155,7 +185,9 @@ END_IF
 (*CheckInputPosVelo*)
 A_CheckInputPosVelo();
 (*检查光栅读数是否在范围内*)
-A_CheckLinearEncoder();]]></ST>
+A_CheckLinearEncoder();
+(**)
+A_GlobalChainProtection();]]></ST>
     </Implementation>
     <Action Name="A_CheckInputPosVelo" Id="{8153d8d0-8d46-4560-8544-b339b78263b6}">
       <Implementation>
@@ -235,6 +267,118 @@ IF Pos_PhaseShifterLin <UserMode.min_UserGapPositionNew THEN
 END_IF
 
 ]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="A_GlobalChainProtection" Id="{ecd1f1b6-2927-4068-abcb-b5e762194253}">
+      <Implementation>
+        <ST><![CDATA[//硬线输入定义
+Global_ChainProtection_In:=Global_ChainProtection_In1 AND Global_ChainProtection_In2
+					AND	Global_ChainProtection_In3 AND Global_ChainProtection_In4;
+//硬线输出定义
+Global_ChainProtection_Out1:=Global_ChainProtection_Done;
+Global_ChainProtection_Out2:=Global_ChainProtection_Done;
+Global_ChainProtection_Out3:=Global_ChainProtection_Done;
+Global_ChainProtection_Out4:=Global_ChainProtection_Done;
+//总开关
+IF NOT Global_ChainProtection_On THEN
+	RETURN;
+END_IF
+//判断插入件状态，是否就位
+//IF NOT IDControlReady THEN
+//	Global_ChainProtection_Done:=FALSE;
+//	Error:= TRUE;
+//	ErrorID:= 1401;
+//	ErrorDescription:='ID NOT READY!';
+//	RETURN;
+//END_IF
+//判断束线是否给出就位信号，暂时由参数表给出TRUE，最终将由IOC接受PV
+IF 	NOT Global_ChainProtection_BeamLineReady THEN
+	Global_ChainProtection_Done:=FALSE;
+	Error:= TRUE;
+	ErrorID:= 1402;
+	ErrorDescription:='BeamLineChainProtection NOT Ready';
+	RETURN;
+END_IF	
+//判断储存环是否给出就位信号，暂时由参数表给出TRUE，最终将由IOC接受PV
+IF 	NOT Global_ChainProtection_StorageRingReady THEN
+	Global_ChainProtection_Done:=FALSE;
+	Error:= TRUE;
+	ErrorID:= 1403;
+	ErrorDescription:='StorageRingChainProtection NOT Ready';
+	RETURN;
+END_IF
+//
+//全局连锁保护程序开始
+//
+//0.检测到下降沿，触发
+//1.判断电机是否在开启状态,没有就打开电源
+//2.判断是否在Moving状态,若有就Stop
+//3.将磁间隙打开到至最大阈值
+//4.到位后给出反馈，且安全PLC触发
+Global_ChainProtection_FTRIG(CLK:=Global_ChainProtection_In);
+IF Global_ChainProtection_FTRIG.Q THEN
+	Global_ChainProtection_Triggered:=TRUE;
+END_IF
+Global_ChainProtection_FTRIG_Manul(CLK:=Global_ChainProtection_ManualOperation);
+IF Global_ChainProtection_FTRIG_Manul.Q THEN
+	Global_ChainProtection_Triggered:=TRUE;
+END_IF
+IF Global_ChainProtection_Triggered THEN
+	CASE Global_ChainProtection_State OF
+		0://1.判断电机是否在开启状态,没有就打开电源
+			IF st_Power=1 THEN
+				Global_ChainProtection_State:=1;
+			ELSE
+				btn_PowerOn:=TRUE;
+				IF btn_PowerOn THEN
+					A_PowerOn();
+				END_IF
+			END_IF
+		1://1.判断是否在谱学扫描模式，如果是，则切换回正常运动模式
+			IF IsSSMotionMode THEN
+				SS_Stop:=TRUE;
+				IsSSMotionMode:=FALSE;
+			END_IF
+			Global_ChainProtection_State:=2;
+		2://2.判断是否在Moving状态,若有就Stop.Taper模式已处理完，此处开始走正常GAP开合逻辑
+			IF MAIN.moveStatusPhaseShifterLin THEN
+				btn_UserGapStop:=TRUE;
+			ELSE
+				Global_ChainProtection_TON_Stop2Move(PT:=T#0.5S);
+				Global_ChainProtection_TON_Stop2Move.IN:=TRUE;
+				IF Global_ChainProtection_TON_Stop2Move.Q THEN
+					Global_ChainProtection_State:=3;
+				END_IF
+			END_IF
+		3://4.将磁间隙打开到至最大阈值
+			Global_ChainProtection_TON(PT:=INT_TO_TIME(LREAL_TO_INT(Global_ChainProtection_MaxGapValue/Global_ChainProtection_MoveVelocity+30))*1000);
+			Global_ChainProtection_TON.IN:=TRUE;
+			Global_ChainProtection_TON_Power2Move(PT:=T#0.1S);
+			Global_ChainProtection_TON_Power2Move.IN:=TRUE;
+			UserGapPositionNew:=Global_ChainProtection_MaxGapValue;
+			UserGapVelocityNew:=Global_ChainProtection_MoveVelocity;
+			btn_UserGapMove:=TRUE;
+			IF Global_ChainProtection_TON_Power2Move.Q THEN
+				IF FB_MOVE.BCGapDone THEN
+					Global_ChainProtection_State:=88;
+				END_IF
+			END_IF
+			IF Global_ChainProtection_TON.Q THEN//如果150s后，还没有运动到指定gap，则报错
+				Global_ChainProtection_State:=-100;
+			END_IF
+		88://4.到位后给出反馈，且安全PLC触发
+			Global_ChainProtection_Done:=TRUE;
+			Plc_EmergencyStop:=FALSE;	
+			Error:=TRUE;
+			ErrorID:=1404;
+			ErrorDescription:='Global_ChainProtection Triggered ';	
+		-100:
+			Global_ChainProtection_Done:=FALSE;
+			Error:=TRUE;
+			ErrorID:=1405;
+			ErrorDescription:='NOT MOVING TO MAXGAP';
+	END_CASE
+END_IF]]></ST>
       </Implementation>
     </Action>
     <Action Name="A_InitCompensationData" Id="{1e6a9c39-c8a5-4c48-b57c-71effe5e3747}">
@@ -748,6 +892,8 @@ END_IF
       <LineId Id="656" Count="0" />
       <LineId Id="1012" Count="0" />
       <LineId Id="1011" Count="0" />
+      <LineId Id="1431" Count="0" />
+      <LineId Id="1430" Count="0" />
     </LineIds>
     <LineIds Name="UserMode.A_CheckInputPosVelo">
       <LineId Id="23" Count="0" />
@@ -779,6 +925,11 @@ END_IF
       <LineId Id="69" Count="8" />
       <LineId Id="99" Count="0" />
       <LineId Id="104" Count="0" />
+    </LineIds>
+    <LineIds Name="UserMode.A_GlobalChainProtection">
+      <LineId Id="2" Count="68" />
+      <LineId Id="86" Count="37" />
+      <LineId Id="1" Count="0" />
     </LineIds>
     <LineIds Name="UserMode.A_InitCompensationData">
       <LineId Id="206" Count="0" />
