@@ -49,7 +49,7 @@ VAR
 	fbEL6001	: FB_SerialCom;
 	
 	moveDonePhaseShifter: BOOL;
-	moveStatusPhaseShifterLin: BOOL;
+
 
 (*Torque*)
 	Torque_PS AT%I*:INT;

@@ -22,7 +22,10 @@ VAR_GLOBAL
 	LEDriftErrorThreshold:LREAL:=0.001;
 (*Lag Distance threshold*)
 	PosDiff_PhaseShifterLin:LREAL:=0.5;
-
+(*key Command*)
+	btn_Power:BOOL;
+	btn_PowerOn: BOOL;
+	btn_PowerOff: BOOL;
 (*Compensation Value*)
 	M_Compensation:ARRAY[1..18] OF Struct_M_Compensation
 :=[
@@ -61,8 +64,8 @@ VAR_GLOBAL
 (*LimitSwitch*)
 	LS_TopFar  :BOOL;
 	LS_TopNear  :BOOL;
-	LS_BottomFar  :BOOL;
-	LS_BottomNear  :BOOL;
+	LS_BottomFar  :BOOL;//not used
+	LS_BottomNear  :BOOL;//not used
 	Unreach_LS_Far:BOOL;
 	Unreach_LS_Near:BOOL;
 (*kill switch*)
@@ -70,10 +73,10 @@ VAR_GLOBAL
 	KS_TopFar_Contact2:BOOL;
 	KS_TopNear_Contact1:BOOL;
 	KS_TopNear_Contact2:BOOL;
-	KS_BottomFar_Contact1:BOOL;
-	KS_BottomFar_Contact2:BOOL;
-	KS_BottomNear_Contact1:BOOL;
-	KS_BottomNear_Contact2:BOOL;
+	KS_BottomFar_Contact1:BOOL;//not used
+	KS_BottomFar_Contact2:BOOL;//not used
+	KS_BottomNear_Contact1:BOOL;//not used
+	KS_BottomNear_Contact2:BOOL;//not used
 	
 (*E-STOP*)
 	KS_CabinetEmergency_contact1:BOOL;
@@ -117,7 +120,8 @@ VAR_GLOBAL
 	PhaseShifterLinPositionDisplay:LREAL;
 	(*Display Velocity*)
 	PhaseShifterLinVelocityDisplay:LREAL;
-	
+	//
+	moveStatusPhaseShifterLin: BOOL;
 
 (******RS232************)
 	RxBufferEL			: ComBuffer;	(* Receive data buffer; used with all receive function blocks *)
