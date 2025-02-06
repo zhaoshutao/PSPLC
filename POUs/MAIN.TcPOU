@@ -246,10 +246,6 @@ END_IF]]></ST>
       <Implementation>
         <ST><![CDATA[IF 	NOT KS_TopNear_Contact1 OR
 	NOT KS_TopNear_Contact2 OR
-	NOT KS_BottomFar_Contact1 OR
-	NOT KS_BottomFar_Contact2 OR
-	NOT KS_BottomNear_Contact1 OR
-	NOT KS_BottomNear_Contact2 OR
 	NOT KS_TopFar_Contact1 OR
 	NOT KS_TopFar_Contact2 OR
 	
@@ -1687,7 +1683,8 @@ END_CASE]]></ST>
     </LineIds>
     <LineIds Name="MAIN.A_CheckHardwareEmergencyStopStatus">
       <LineId Id="2" Count="0" />
-      <LineId Id="7" Count="7" />
+      <LineId Id="7" Count="0" />
+      <LineId Id="12" Count="2" />
       <LineId Id="30" Count="0" />
       <LineId Id="24" Count="5" />
       <LineId Id="5" Count="0" />
