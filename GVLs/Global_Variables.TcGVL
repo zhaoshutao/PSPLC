@@ -5,6 +5,11 @@
 VAR_GLOBAL
 (*IDControl Ready*)
 	IDControlReady:BOOL;
+(*RecipeDescription*)
+	RecipeSavedDate:STRING;
+	RecipeDescription:STRING;
+(*Reset*)
+	btn_Reset:BOOL;
 (*Error Massage*)
 	Error:BOOL;
 	ErrorID:DINT;
@@ -126,7 +131,29 @@ VAR_GLOBAL
 (******RS232************)
 	RxBufferEL			: ComBuffer;	(* Receive data buffer; used with all receive function blocks *)
 	TxBufferEL			: ComBuffer;	(* Transmit data buffer; used with all receive function blocks *)
-
+(*input protection*)
+	//
+	min_UserGapPositionNew:LREAL:=10;
+	max_UserGapPositionNew:LREAL:=200;
+	inRange_UserGapPositionNew:BOOL;
+		//LE protection position
+	min_UserLEProtectionGapPosition:LREAL;
+	min_ThresholdGapSoft2LEProtection:LREAL;
+	max_UserLEProtectionGapPosition:LREAL;
+	max_ThresholdGapSoft2LEProtection:LREAL;
+	//
+	min_UserGapVelocityNew:LREAL:=0;
+	max_UserGapVelocityNew:LREAL:=3;
+	inRange_UserGapVelocityNew:BOOL;
+	//
+	min_UserTaperPositionNew: LREAL:=0;;
+	max_UserTaperPositionNew: LREAL:=4;
+	inRange_UserTaperPositionNew: BOOL;
+	//
+	min_UserTaperVelocityNew: LREAL:=0;
+	max_UserTaperVelocityNew: LREAL:=1;
+	inRange_UserTaperVelocityNew: BOOL;
+	
 END_VAR
 
 ]]></Declaration>

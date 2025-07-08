@@ -139,11 +139,12 @@ VAR
 	CryogenicCompensation_RightBottom:LREAL;
 	CryogenicCompensationDone: BOOL;
 	
-	(**)
+(**)
 	bDriveDiagMessageAndNumber  : BOOL;
 	m_GetDriveStatusState:INT;
 	GetDriveStatusStateDone:BOOL;
 	GetDriveStatusStateError:BOOL;
+	GetDriveStatusTON: TON;
 	//	
 	fb_SoEReadDiagMessage_PhaseShifter: FB_SoEReadDiagMessage;
 	DriveDiagMessage_PhaseShifter:STRING;
@@ -166,6 +167,45 @@ VAR
 	Exe_Kill_Done:BOOL;
 
 	KS_RightBottom_Near_Contact2: BOOL;
+	
+	//
+	//more parameters get:gear;feedback2 direction 
+	//
+	//GetMoreDriveStatus_FunctionON:BOOL:=TRUE;
+	GetDriveStatusTON2: TON;
+	//GearNumerator,st182
+	st_p182_PhaseShifter:ST_P182;
+	FB_SoERead_GearNumerator_PhaseShifter: FB_SoERead;
+	GearNumeratorGet_PhaseShifter:UDINT;
+	GearNumeratorConfigured_PhaseShifter:UDINT;
+	//GearDenominator,st183
+	st_p183_PhaseShifter:ST_P183;
+	FB_SoERead_GearDenominator_PhaseShifter: FB_SoERead;
+	GearDenominatorGet_PhaseShifter:UDINT;
+	GearDenominatorConfigured_PhaseShifter:UDINT;
+	//Feedback2direction,st180
+	st_p180_PhaseShifter:ST_P180;
+	FB_SoERead_Feedback2direction_PhaseShifter: FB_SoERead;
+	Feedback2directionGet_PhaseShifter:UINT;
+	Feedback2directionConfigured_PhaseShifter:UINT;
+	//
+	//RestartDrivers
+		(*重启驱动器*)
+	btn_RestartDriversAll:BOOL;
+	btn_RestartDriver1:BOOL;
+	btn_RestartDriver2:BOOL;
+	btn_RestartDriver3:BOOL;
+	btn_RestartDriver4:BOOL;
+	btn_RestartDriver5:BOOL;
+	btn_RestartDriver6:BOOL;
+	btn_RestartDriver7:BOOL;
+	btn_RestartDriver8:BOOL;
+	Relay_EL2624 AT %Q*:ARRAY[0..7]OF  BOOL;
+	RestartDriver_RTRIG:R_TRIG;
+	RestartDriver_TON:TON;
+	RestartDriver_Triggered:BOOL;
+	RestartDriver_State:DINT;
+	RestartDriver_Done:BOOL;
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[(*加载Ricipe参数*)
@@ -230,10 +270,16 @@ ELSE
 END_IF
 
 (*IOC Start*)
-IF IDControlReady THEN
+//IF IDControlReady THEN
 	bExe_load_Prog:=TRUE;
 	A_LoadOpcIocShellExe();
-END_IF]]></ST>
+//END_IF
+
+(*检查光栅读数是否在范围内*)
+A_CheckLinearEncoder();
+
+(*RestartDrivers*)
+A_RestartDrivers();]]></ST>
     </Implementation>
     <Folder Name="Axis" Id="{1f5db9b2-f074-43bd-a7a5-f28b002c6ac6}" />
     <Folder Name="Check" Id="{79c48f21-8e44-4159-8773-87594d6e7620}" />
@@ -336,61 +382,129 @@ Unreach_LS_Near:=LS_TopNear;
 ]]></ST>
       </Implementation>
     </Action>
+    <Action Name="A_CheckLinearEncoder" Id="{04ef6a41-e2ba-498d-aa00-f823237bb5de}" FolderPath="Check\">
+      <Implementation>
+        <ST><![CDATA[//如果没有使用光栅、或者光栅参数没设置好，则不检查光栅位置
+IF NOT USELinearEncoder OR NOT PositionBiasDone THEN
+	RETURN;
+END_IF
+IF Pos_PhaseShifterLin <=0 THEN
+	ErrorID:=1101;
+	Error:=TRUE;
+	ErrorDescription:='Pos_PhaseShifterLin <=0';
+	FB_PlcEmergencyStop();
+	LED_Error:=TRUE;
+END_IF
+//
+
+min_UserLEProtectionGapPosition:=min_UserGapPositionNew-min_ThresholdGapSoft2LEProtection;//回程误差有0.1mm
+max_UserLEProtectionGapPosition:=max_UserGapPositionNew+max_ThresholdGapSoft2LEProtection;
+IF Pos_PhaseShifterLin >max_UserLEProtectionGapPosition THEN
+	ErrorID:=1105;
+	Error:=TRUE;
+	ErrorDescription:='Pos_PhaseShifterLin >max_UserLEProtectionGapPosition';
+	FB_PlcEmergencyStop();
+	LED_Error:=TRUE;
+END_IF
+
+//
+IF Pos_PhaseShifterLin <min_UserLEProtectionGapPosition THEN
+	ErrorID:=1109;
+	Error:=TRUE;
+	ErrorDescription:='Pos_PhaseShifterLin <min_UserLEProtectionGapPosition';
+	FB_PlcEmergencyStop();
+	LED_Error:=TRUE;
+END_IF
+
+]]></ST>
+      </Implementation>
+    </Action>
     <Action Name="A_GetDriverStatus" Id="{e05cf975-7b3e-4430-bb2e-a308f4391f1b}" FolderPath="Driver\">
       <Implementation>
-        <ST><![CDATA[IF bReloadDriveDiagMessageAndNumber THEN
+        <ST><![CDATA[//
+//DriveMessage/Drive Number/Gear number/feedback2 direction
+//
+IF bReloadDriveDiagMessageAndNumber THEN
 	m_GetDriveStatusState:=0;
 	bReloadDriveDiagMessageAndNumber:=FALSE;
 END_IF
+GetDriveStatusTON(PT:=T#1S);
+GetDriveStatusTON2(PT:=T#0.1S);
 A_GetDriverStatusMC();
 CASE m_GetDriveStatusState OF
 	0:
-		(*
-		IF 	fb_SoEReadDiagMessage_LeftTop.bError
-			OR fb_SoEReadDiagMessage_RightTop.bError
-			OR fb_SoEReadDiagMessage_LeftBottom.bError
-			OR fb_SoEReadDiagMessage_RightBottom.bError
-			OR FB_SoEReadDiagNumber_LeftTop.bError
-			OR FB_SoEReadDiagNumber_RightTop.bError
-			OR FB_SoEReadDiagNumber_LeftBottom.bError
-			OR FB_SoEReadDiagNumber_RightBottom.bError THEN
-			m_GetDriveStatusState:=-100;
-		ELSE
-			m_GetDriveStatusState:=1;
-		END_IF
-		*)
+		GetDriveStatusTON.IN:=TRUE;
 		m_GetDriveStatusState:=1;
 	1:
-		bDriveDiagMessageAndNumber:=TRUE;
-		m_GetDriveStatusState:=2;
+		IF GetDriveStatusTON.Q THEN
+			bDriveDiagMessageAndNumber:=TRUE;
+			m_GetDriveStatusState:=2;
+		END_IF
 	2:
+		GetDriveStatusTON.IN:=FALSE;
 		DriveDiagMessage_PhaseShifter:=fb_SoEReadDiagMessage_PhaseShifter.sDiagMessage.strData;
 		//
 		DriveDiagNumber_PhaseShifter:=FB_SoEReadDiagNumber_PhaseShifter.iDiagNumber;
 		//
+		GearNumeratorGet_PhaseShifter:=st_p182_PhaseShifter.Feedback_2_geat_numerator;
+		//
+		GearDenominatorGet_PhaseShifter:=st_p183_PhaseShifter.Feedback_2_geat_denominator;
+		//
+		Feedback2directionGet_PhaseShifter:=st_p180_PhaseShifter.Feedback_direction;
+		//
 		IF 	NOT fb_SoEReadDiagMessage_PhaseShifter.bBusy
-			AND NOT FB_SoEReadDiagNumber_PhaseShifter.bBusy THEN
-			m_GetDriveStatusState:=88;
+			AND NOT FB_SoEReadDiagNumber_PhaseShifter.bBusy
+			AND NOT FB_SoERead_GearNumerator_PhaseShifter.bBusy 
+			AND NOT FB_SoERead_GearDenominator_PhaseShifter.bBusy 
+			AND NOT FB_SoERead_Feedback2direction_PhaseShifter.bBusy  THEN
+				GetDriveStatusTON2.IN:=TRUE;
+				IF GetDriveStatusTON2.Q THEN
+					m_GetDriveStatusState:=88;
+				END_IF
 		END_IF
 		IF 	fb_SoEReadDiagMessage_PhaseShifter.bError
-			OR FB_SoEReadDiagNumber_PhaseShifter.bError THEN
+			OR FB_SoEReadDiagNumber_PhaseShifter.bError
+			OR FB_SoERead_GearNumerator_PhaseShifter.bError 
+			OR FB_SoERead_GearDenominator_PhaseShifter.bError 
+			OR FB_SoERead_Feedback2direction_PhaseShifter.bError 
+		THEN
 			m_GetDriveStatusState:=-100;
 		END_IF
-		(*Drive Status*)
-		//D012, Axis state machine: Control and power section ready
-		IF DriveDiagNumber_PhaseShifter=16#D012 THEN
-			DriveStatus:=1;
-		//D013, Axis state machine: Axis in operation
-		ELSIF DriveDiagNumber_PhaseShifter=16#D013 THEN
-			DriveStatus:=2;
-		ELSE
-			DriveStatus:=0;
-		END_IF
+		
 	88:
 		bDriveDiagMessageAndNumber:=FALSE;
 		A_GetDriverStatusMC();
 		GetDriveStatusStateDone:=TRUE;
 		GetDriveStatusStateError:=FALSE;
+		//
+		(*Drive Status*)
+		//D012, Axis state machine: Control and power section ready,53266
+		IF DriveDiagNumber_PhaseShifter=16#D012  THEN
+			DriveStatus:=1;
+		//D013, Axis state machine: Axis in operation,53267
+		ELSIF DriveDiagNumber_PhaseShifter=16#D013  THEN
+			DriveStatus:=2;
+		//D014，Axis state machine: Axis halt.53266和53267中间会经历这么一个状态，算正常状态
+		ELSIF DriveDiagNumber_PhaseShifter=16#D014  THEN
+			DriveStatus:=3;
+		ELSE
+			DriveStatus:=0;
+		END_IF
+		//
+		//
+		//	//check statusGet and status configured
+		IF 	GearNumeratorGet_PhaseShifter<>GearNumeratorConfigured_PhaseShifter 
+			OR GearDenominatorGet_PhaseShifter<>GearDenominatorConfigured_PhaseShifter 
+			OR Feedback2directionGet_PhaseShifter<>Feedback2directionConfigured_PhaseShifter  THEN
+				bDriveDiagMessageAndNumber:=FALSE;
+				A_GetDriverStatusMC();
+				GetDriveStatusStateDone:=FALSE;
+				GetDriveStatusStateError:=TRUE;
+				Error:=TRUE;
+				ErrorId:=1302;
+				ErrorDescription:='gearOrfb2direction Error';
+				Plc_EmergencyStop:=FALSE;
+		END_IF
 		m_GetDriveStatusState:=0;
 	-100:
 		bDriveDiagMessageAndNumber:=FALSE;
@@ -401,7 +515,6 @@ CASE m_GetDriveStatusState OF
 		ErrorId:=1301;
 		ErrorDescription:='GetDriveStatusStateError';
 END_CASE
-
 ]]></ST>
       </Implementation>
     </Action>
@@ -896,6 +1009,927 @@ END_CASE
                     <l2 n="Connectors" />
                     <v n="Id">108L</v>
                   </o>
+                  <o>
+                    <v n="ILActive">false</v>
+                    <v n="FBDValid">false</v>
+                    <v n="ILValid">false</v>
+                    <l2 n="ILLines" />
+                    <v n="Comment">""</v>
+                    <v n="Title">""</v>
+                    <v n="Label">""</v>
+                    <v n="OutCommented">false</v>
+                    <l2 n="NetworkItems" cet="BoxTreeBox">
+                      <o>
+                        <v n="BoxType">"FB_SoERead"</v>
+                        <o n="Instance" t="Operand">
+                          <v n="Operand">"FB_SoERead_GearNumerator_PhaseShifter"</v>
+                          <v n="Type">"FB_SoERead"</v>
+                          <v n="Comment">""</v>
+                          <v n="SymbolComment">""</v>
+                          <v n="Address">""</v>
+                          <o n="Flags" t="Flags">
+                            <v n="Flags">0</v>
+                            <v n="Fixed">false</v>
+                            <v n="Extensible">false</v>
+                          </o>
+                          <v n="LValue">false</v>
+                          <v n="Boolean">false</v>
+                          <v n="IsInstance">true</v>
+                          <v n="Id">128L</v>
+                        </o>
+                        <o n="OutputItems" t="OutputItemList">
+                          <l2 n="OutputItems" cet="Operand">
+                            <n />
+                            <o>
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">true</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">130L</v>
+                            </o>
+                            <o>
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">true</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">131L</v>
+                            </o>
+                            <o>
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">true</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">132L</v>
+                            </o>
+                            <o>
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">true</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">133L</v>
+                            </o>
+                          </l2>
+                        </o>
+                        <o n="Flags" t="Flags">
+                          <v n="Flags">0</v>
+                          <v n="Fixed">false</v>
+                          <v n="Extensible">false</v>
+                        </o>
+                        <n n="InputFlags" />
+                        <l2 n="InputItems" cet="BoxTreeOperand">
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">135L</v>
+                            </o>
+                            <v n="Id">134L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"P_0_IDN + 182"</v>
+                              <v n="Type">"WORD"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">137L</v>
+                            </o>
+                            <v n="Id">136L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"16#40"</v>
+                              <v n="Type">"INT"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">139L</v>
+                            </o>
+                            <v n="Id">138L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"ADR(st_p182_PhaseShifter)"</v>
+                              <v n="Type">"POINTER TO ST_P182"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">141L</v>
+                            </o>
+                            <v n="Id">140L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"SIZEOF(st_p182_PhaseShifter)"</v>
+                              <v n="Type">"UINT"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">143L</v>
+                            </o>
+                            <v n="Id">142L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"bDriveDiagMessageAndNumber"</v>
+                              <v n="Type">"BOOL"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">145L</v>
+                            </o>
+                            <v n="Id">144L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">147L</v>
+                            </o>
+                            <v n="Id">146L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"PhaseShifterLin.NcToPlc"</v>
+                              <v n="Type">"NCTOPLC_AXIS_REF"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">149L</v>
+                            </o>
+                            <v n="Id">148L</v>
+                          </o>
+                        </l2>
+                        <o n="InputParam" t="ParamList">
+                          <l2 n="Names" cet="String">
+                            <v>sNetId</v>
+                            <v>nIdn</v>
+                            <v>nElement</v>
+                            <v>pDstBuf</v>
+                            <v>cbBufLen</v>
+                            <v>bExecute</v>
+                            <v>tTimeout</v>
+                            <v>Axis</v>
+                          </l2>
+                          <l2 n="Types" cet="String">
+                            <v>T_AmsNetId</v>
+                            <v>WORD</v>
+                            <v>BYTE</v>
+                            <v>PVOID</v>
+                            <v>UDINT</v>
+                            <v>BOOL</v>
+                            <v>TIME</v>
+                            <v>NCTOPLC_AXIS_REF[REF]</v>
+                          </l2>
+                        </o>
+                        <o n="OutputParam" t="ParamList">
+                          <l2 n="Names" cet="String">
+                            <v>bBusy</v>
+                            <v>bError</v>
+                            <v>iAdsErrId</v>
+                            <v>iSercosErrId</v>
+                            <v>dwAttribute</v>
+                          </l2>
+                          <l2 n="Types" cet="String">
+                            <v>BOOL</v>
+                            <v>BOOL</v>
+                            <v>UINT</v>
+                            <v>UINT</v>
+                            <v>DWORD</v>
+                          </l2>
+                        </o>
+                        <v n="CallType" t="Operator">FunctionBlock</v>
+                        <v n="EN">false</v>
+                        <v n="ENO">false</v>
+                        <n n="STSnippet" />
+                        <v n="ContainsExtensibleInputs">false</v>
+                        <v n="ProvidesSTSnippet">false</v>
+                        <v n="Id">129L</v>
+                      </o>
+                    </l2>
+                    <l2 n="Connectors" />
+                    <v n="Id">127L</v>
+                  </o>
+                  <o>
+                    <v n="ILActive">false</v>
+                    <v n="FBDValid">false</v>
+                    <v n="ILValid">false</v>
+                    <l2 n="ILLines" />
+                    <v n="Comment">""</v>
+                    <v n="Title">""</v>
+                    <v n="Label">""</v>
+                    <v n="OutCommented">false</v>
+                    <l2 n="NetworkItems" cet="BoxTreeBox">
+                      <o>
+                        <v n="BoxType">"FB_SoERead"</v>
+                        <o n="Instance" t="Operand">
+                          <v n="Operand">"FB_SoERead_GearDenominator_PhaseShifter"</v>
+                          <v n="Type">"FB_SoERead"</v>
+                          <v n="Comment">""</v>
+                          <v n="SymbolComment">""</v>
+                          <v n="Address">""</v>
+                          <o n="Flags" t="Flags">
+                            <v n="Flags">0</v>
+                            <v n="Fixed">false</v>
+                            <v n="Extensible">false</v>
+                          </o>
+                          <v n="LValue">false</v>
+                          <v n="Boolean">false</v>
+                          <v n="IsInstance">true</v>
+                          <v n="Id">151L</v>
+                        </o>
+                        <o n="OutputItems" t="OutputItemList">
+                          <l2 n="OutputItems" cet="Operand">
+                            <n />
+                            <o>
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">true</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">153L</v>
+                            </o>
+                            <o>
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">true</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">154L</v>
+                            </o>
+                            <o>
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">true</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">155L</v>
+                            </o>
+                            <o>
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">true</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">156L</v>
+                            </o>
+                          </l2>
+                        </o>
+                        <o n="Flags" t="Flags">
+                          <v n="Flags">0</v>
+                          <v n="Fixed">false</v>
+                          <v n="Extensible">false</v>
+                        </o>
+                        <n n="InputFlags" />
+                        <l2 n="InputItems" cet="BoxTreeOperand">
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">158L</v>
+                            </o>
+                            <v n="Id">157L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"P_0_IDN + 183"</v>
+                              <v n="Type">"WORD"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">160L</v>
+                            </o>
+                            <v n="Id">159L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"16#40"</v>
+                              <v n="Type">"INT"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">162L</v>
+                            </o>
+                            <v n="Id">161L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"ADR(st_p183_PhaseShifter)"</v>
+                              <v n="Type">"POINTER TO ST_P183"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">164L</v>
+                            </o>
+                            <v n="Id">163L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"SIZEOF(st_p183_PhaseShifter)"</v>
+                              <v n="Type">"UINT"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">166L</v>
+                            </o>
+                            <v n="Id">165L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"bDriveDiagMessageAndNumber"</v>
+                              <v n="Type">"BOOL"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">168L</v>
+                            </o>
+                            <v n="Id">167L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">170L</v>
+                            </o>
+                            <v n="Id">169L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"PhaseShifterLin.NcToPlc"</v>
+                              <v n="Type">"NCTOPLC_AXIS_REF"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">172L</v>
+                            </o>
+                            <v n="Id">171L</v>
+                          </o>
+                        </l2>
+                        <o n="InputParam" t="ParamList">
+                          <l2 n="Names" cet="String">
+                            <v>sNetId</v>
+                            <v>nIdn</v>
+                            <v>nElement</v>
+                            <v>pDstBuf</v>
+                            <v>cbBufLen</v>
+                            <v>bExecute</v>
+                            <v>tTimeout</v>
+                            <v>Axis</v>
+                          </l2>
+                          <l2 n="Types" cet="String">
+                            <v>T_AmsNetId</v>
+                            <v>WORD</v>
+                            <v>BYTE</v>
+                            <v>PVOID</v>
+                            <v>UDINT</v>
+                            <v>BOOL</v>
+                            <v>TIME</v>
+                            <v>NCTOPLC_AXIS_REF[REF]</v>
+                          </l2>
+                        </o>
+                        <o n="OutputParam" t="ParamList">
+                          <l2 n="Names" cet="String">
+                            <v>bBusy</v>
+                            <v>bError</v>
+                            <v>iAdsErrId</v>
+                            <v>iSercosErrId</v>
+                            <v>dwAttribute</v>
+                          </l2>
+                          <l2 n="Types" cet="String">
+                            <v>BOOL</v>
+                            <v>BOOL</v>
+                            <v>UINT</v>
+                            <v>UINT</v>
+                            <v>DWORD</v>
+                          </l2>
+                        </o>
+                        <v n="CallType" t="Operator">FunctionBlock</v>
+                        <v n="EN">false</v>
+                        <v n="ENO">false</v>
+                        <n n="STSnippet" />
+                        <v n="ContainsExtensibleInputs">false</v>
+                        <v n="ProvidesSTSnippet">false</v>
+                        <v n="Id">152L</v>
+                      </o>
+                    </l2>
+                    <l2 n="Connectors" />
+                    <v n="Id">150L</v>
+                  </o>
+                  <o>
+                    <v n="ILActive">false</v>
+                    <v n="FBDValid">false</v>
+                    <v n="ILValid">false</v>
+                    <l2 n="ILLines" />
+                    <v n="Comment">""</v>
+                    <v n="Title">""</v>
+                    <v n="Label">""</v>
+                    <v n="OutCommented">false</v>
+                    <l2 n="NetworkItems" cet="BoxTreeBox">
+                      <o>
+                        <v n="BoxType">"FB_SoERead"</v>
+                        <o n="Instance" t="Operand">
+                          <v n="Operand">"FB_SoERead_Feedback2direction_PhaseShifter"</v>
+                          <v n="Type">"FB_SoERead"</v>
+                          <v n="Comment">""</v>
+                          <v n="SymbolComment">""</v>
+                          <v n="Address">""</v>
+                          <o n="Flags" t="Flags">
+                            <v n="Flags">0</v>
+                            <v n="Fixed">false</v>
+                            <v n="Extensible">false</v>
+                          </o>
+                          <v n="LValue">false</v>
+                          <v n="Boolean">false</v>
+                          <v n="IsInstance">true</v>
+                          <v n="Id">174L</v>
+                        </o>
+                        <o n="OutputItems" t="OutputItemList">
+                          <l2 n="OutputItems" cet="Operand">
+                            <n />
+                            <o>
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">true</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">176L</v>
+                            </o>
+                            <o>
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">true</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">177L</v>
+                            </o>
+                            <o>
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">true</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">178L</v>
+                            </o>
+                            <o>
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">true</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">179L</v>
+                            </o>
+                          </l2>
+                        </o>
+                        <o n="Flags" t="Flags">
+                          <v n="Flags">0</v>
+                          <v n="Fixed">false</v>
+                          <v n="Extensible">false</v>
+                        </o>
+                        <n n="InputFlags" />
+                        <l2 n="InputItems" cet="BoxTreeOperand">
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">181L</v>
+                            </o>
+                            <v n="Id">180L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"P_0_IDN + 180"</v>
+                              <v n="Type">"WORD"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">183L</v>
+                            </o>
+                            <v n="Id">182L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"16#40"</v>
+                              <v n="Type">"INT"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">185L</v>
+                            </o>
+                            <v n="Id">184L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"ADR(st_p180_PhaseShifter)"</v>
+                              <v n="Type">"POINTER TO ST_P180"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">187L</v>
+                            </o>
+                            <v n="Id">186L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"SIZEOF(st_p180_PhaseShifter)"</v>
+                              <v n="Type">"UINT"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">189L</v>
+                            </o>
+                            <v n="Id">188L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"bDriveDiagMessageAndNumber"</v>
+                              <v n="Type">"BOOL"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">191L</v>
+                            </o>
+                            <v n="Id">190L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">""</v>
+                              <n n="Type" />
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">193L</v>
+                            </o>
+                            <v n="Id">192L</v>
+                          </o>
+                          <o>
+                            <o n="Operand" t="Operand">
+                              <v n="Operand">"PhaseShifterLin.NcToPlc"</v>
+                              <v n="Type">"NCTOPLC_AXIS_REF"</v>
+                              <v n="Comment">""</v>
+                              <v n="SymbolComment">""</v>
+                              <v n="Address">""</v>
+                              <o n="Flags" t="Flags">
+                                <v n="Flags">0</v>
+                                <v n="Fixed">false</v>
+                                <v n="Extensible">false</v>
+                              </o>
+                              <v n="LValue">false</v>
+                              <v n="Boolean">false</v>
+                              <v n="IsInstance">false</v>
+                              <v n="Id">195L</v>
+                            </o>
+                            <v n="Id">194L</v>
+                          </o>
+                        </l2>
+                        <o n="InputParam" t="ParamList">
+                          <l2 n="Names" cet="String">
+                            <v>sNetId</v>
+                            <v>nIdn</v>
+                            <v>nElement</v>
+                            <v>pDstBuf</v>
+                            <v>cbBufLen</v>
+                            <v>bExecute</v>
+                            <v>tTimeout</v>
+                            <v>Axis</v>
+                          </l2>
+                          <l2 n="Types" cet="String">
+                            <v>T_AmsNetId</v>
+                            <v>WORD</v>
+                            <v>BYTE</v>
+                            <v>PVOID</v>
+                            <v>UDINT</v>
+                            <v>BOOL</v>
+                            <v>TIME</v>
+                            <v>NCTOPLC_AXIS_REF[REF]</v>
+                          </l2>
+                        </o>
+                        <o n="OutputParam" t="ParamList">
+                          <l2 n="Names" cet="String">
+                            <v>bBusy</v>
+                            <v>bError</v>
+                            <v>iAdsErrId</v>
+                            <v>iSercosErrId</v>
+                            <v>dwAttribute</v>
+                          </l2>
+                          <l2 n="Types" cet="String">
+                            <v>BOOL</v>
+                            <v>BOOL</v>
+                            <v>UINT</v>
+                            <v>UINT</v>
+                            <v>DWORD</v>
+                          </l2>
+                        </o>
+                        <v n="CallType" t="Operator">FunctionBlock</v>
+                        <v n="EN">false</v>
+                        <v n="ENO">false</v>
+                        <n n="STSnippet" />
+                        <v n="ContainsExtensibleInputs">false</v>
+                        <v n="ProvidesSTSnippet">false</v>
+                        <v n="Id">175L</v>
+                      </o>
+                    </l2>
+                    <l2 n="Connectors" />
+                    <v n="Id">173L</v>
+                  </o>
                 </l2>
                 <v n="BranchCounter">0</v>
                 <v n="ValidIds">true</v>
@@ -925,7 +1959,7 @@ END_CASE
         <ST><![CDATA[	Pos_PhaseShifterLin:=DINT_TO_LREAL(LREAL_TO_DINT(PhaseShifterLin.NcToPlc.ActPos*100000))/100000;
 	moveStatusPhaseShifterLin:=PhaseShifterLin.Status.Moving;
 	Velo_PhaseShifterLin:=DINT_TO_LREAL(LREAL_TO_DINT(PhaseShifterLin.NcToPlc.ActVelo*100000))/100000;
-	PosDiff_PhaseShifterLin_actual:=PhaseShifterLin.NcToPlc.PosDiff;
+	PosDiff_PhaseShifterLin_actual:=DINT_TO_LREAL(LREAL_TO_DINT(PhaseShifterLin.NcToPlc.PosDiff*100000))/100000;
 	PhaseShifterLin.ReadStatus();
 
 
@@ -1071,6 +2105,63 @@ NT_StartProcess_Load(
 	LED_Error:=TRUE;
 END_IF
 ]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="A_RestartDrivers" Id="{d1732994-27d5-4d0a-bd2e-fb077b65c9a9}" FolderPath="Driver\">
+      <Implementation>
+        <ST><![CDATA[Relay_EL2624[0]:=btn_RestartDriver1;
+Relay_EL2624[1]:=btn_RestartDriver2;
+Relay_EL2624[2]:=btn_RestartDriver3;
+Relay_EL2624[3]:=btn_RestartDriver4;
+Relay_EL2624[4]:=btn_RestartDriver5;
+Relay_EL2624[5]:=btn_RestartDriver6;
+Relay_EL2624[6]:=btn_RestartDriver7;
+Relay_EL2624[7]:=btn_RestartDriver8;
+///
+//1.上升沿触发，btn_RestartDrivers上升沿后，btn_RestartDriver1~8全部高电平
+//2、3s后，Driver1~8全部恢复低电平
+//3、恢复全部状态到初始
+///
+RestartDriver_RTRIG(CLK:=btn_RestartDriversAll);
+IF RestartDriver_RTRIG.Q THEN
+	RestartDriver_Triggered:=TRUE;
+	RestartDriver_Done:=FALSE;
+END_IF
+IF RestartDriver_Triggered THEN
+	CASE RestartDriver_State OF
+		0:
+			btn_RestartDriver1:=TRUE;
+			btn_RestartDriver2:=TRUE;
+			btn_RestartDriver3:=TRUE;
+			btn_RestartDriver4:=TRUE;
+			btn_RestartDriver5:=TRUE;
+			btn_RestartDriver6:=TRUE;
+			btn_RestartDriver7:=TRUE;
+			btn_RestartDriver8:=TRUE;
+			//计时开始
+			RestartDriver_TON(PT:=T#3S);
+			RestartDriver_TON.IN:=TRUE;
+			IF RestartDriver_TON.Q THEN
+				RestartDriver_State:=1;
+			END_IF
+		1:
+			btn_RestartDriver1:=FALSE;
+			btn_RestartDriver2:=FALSE;
+			btn_RestartDriver3:=FALSE;
+			btn_RestartDriver4:=FALSE;
+			btn_RestartDriver5:=FALSE;
+			btn_RestartDriver6:=FALSE;
+			btn_RestartDriver7:=FALSE;
+			btn_RestartDriver8:=FALSE;
+			RestartDriver_State:=88;
+		88:
+			RestartDriver_TON.IN:=FALSE;
+			btn_RestartDriversAll:=FALSE;
+			RestartDriver_State:=0;
+			RestartDriver_Triggered:=FALSE;
+			RestartDriver_Done:=TRUE;
+	END_CASE
+END_IF]]></ST>
       </Implementation>
     </Action>
     <Action Name="A_RestartTC" Id="{737d9420-c364-46ec-805e-ce283c214994}" FolderPath="TC\">
@@ -1680,6 +2771,10 @@ END_CASE]]></ST>
       <LineId Id="2370" Count="0" />
       <LineId Id="2367" Count="0" />
       <LineId Id="2372" Count="0" />
+      <LineId Id="2546" Count="1" />
+      <LineId Id="2545" Count="0" />
+      <LineId Id="2629" Count="1" />
+      <LineId Id="2628" Count="0" />
     </LineIds>
     <LineIds Name="MAIN.A_CheckHardwareEmergencyStopStatus">
       <LineId Id="2" Count="0" />
@@ -1725,36 +2820,25 @@ END_CASE]]></ST>
       <LineId Id="124" Count="0" />
       <LineId Id="100" Count="0" />
     </LineIds>
+    <LineIds Name="MAIN.A_CheckLinearEncoder">
+      <LineId Id="61" Count="0" />
+      <LineId Id="105" Count="0" />
+      <LineId Id="59" Count="1" />
+      <LineId Id="1" Count="0" />
+      <LineId Id="4" Count="3" />
+      <LineId Id="2" Count="1" />
+      <LineId Id="29" Count="0" />
+      <LineId Id="107" Count="1" />
+      <LineId Id="106" Count="0" />
+      <LineId Id="31" Count="6" />
+      <LineId Id="69" Count="8" />
+      <LineId Id="99" Count="0" />
+      <LineId Id="104" Count="0" />
+    </LineIds>
     <LineIds Name="MAIN.A_GetDriverStatus">
-      <LineId Id="192" Count="2" />
-      <LineId Id="191" Count="0" />
-      <LineId Id="102" Count="0" />
-      <LineId Id="104" Count="1" />
-      <LineId Id="208" Count="0" />
-      <LineId Id="106" Count="11" />
-      <LineId Id="209" Count="1" />
-      <LineId Id="118" Count="4" />
-      <LineId Id="126" Count="0" />
-      <LineId Id="221" Count="0" />
-      <LineId Id="131" Count="0" />
-      <LineId Id="214" Count="0" />
-      <LineId Id="139" Count="3" />
-      <LineId Id="149" Count="2" />
-      <LineId Id="199" Count="0" />
-      <LineId Id="204" Count="0" />
-      <LineId Id="195" Count="0" />
-      <LineId Id="198" Count="0" />
-      <LineId Id="205" Count="0" />
-      <LineId Id="202" Count="0" />
-      <LineId Id="200" Count="1" />
-      <LineId Id="206" Count="0" />
-      <LineId Id="197" Count="0" />
-      <LineId Id="152" Count="4" />
-      <LineId Id="207" Count="0" />
-      <LineId Id="157" Count="4" />
-      <LineId Id="212" Count="1" />
-      <LineId Id="211" Count="0" />
-      <LineId Id="162" Count="1" />
+      <LineId Id="222" Count="8" />
+      <LineId Id="316" Count="0" />
+      <LineId Id="232" Count="83" />
       <LineId Id="39" Count="0" />
     </LineIds>
     <LineIds Name="MAIN.A_InitAxisParameters">
@@ -1816,6 +2900,24 @@ END_CASE]]></ST>
       <LineId Id="3" Count="1" />
       <LineId Id="43" Count="0" />
       <LineId Id="21" Count="0" />
+    </LineIds>
+    <LineIds Name="MAIN.A_RestartDrivers">
+      <LineId Id="1" Count="12" />
+      <LineId Id="15" Count="5" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="21" Count="0" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="29" Count="1" />
+      <LineId Id="32" Count="4" />
+      <LineId Id="28" Count="0" />
+      <LineId Id="25" Count="1" />
+      <LineId Id="24" Count="0" />
+      <LineId Id="37" Count="2" />
+      <LineId Id="41" Count="6" />
+      <LineId Id="40" Count="0" />
+      <LineId Id="48" Count="6" />
+      <LineId Id="22" Count="0" />
+      <LineId Id="27" Count="0" />
     </LineIds>
     <LineIds Name="MAIN.A_SafePlcStartInit">
       <LineId Id="0" Count="45" />

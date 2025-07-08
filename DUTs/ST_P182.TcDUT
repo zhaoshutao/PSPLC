@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.6">
+  <DUT Name="ST_P182" Id="{71064e6b-d4d8-4abd-8344-dc53d7f5aca6}">
+    <Declaration><![CDATA[// Feedback 2 gear numerator
+TYPE ST_P182 :
+STRUCT
+	Feedback_2_geat_numerator:UDINT;
+END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

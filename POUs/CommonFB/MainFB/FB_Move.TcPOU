@@ -48,7 +48,7 @@ END_VAR]]></Declaration>
       <ST><![CDATA[IF PowerState=1 THEN
 	IF Mode=1 AND BCGapMove THEN
 		A_BCGapMove();
-END_IF
+	END_IF
 END_IF]]></ST>
     </Implementation>
     <Action Name="A_BCGapMove" Id="{14a23b8d-1d11-4027-a881-ef621e956d3f}">
