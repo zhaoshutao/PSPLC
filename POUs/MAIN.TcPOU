@@ -2139,7 +2139,7 @@ IF RestartDriver_Triggered THEN
 			btn_RestartDriver7:=TRUE;
 			btn_RestartDriver8:=TRUE;
 			//计时开始
-			RestartDriver_TON(PT:=T#3S);
+			RestartDriver_TON(PT:=T#10S);
 			RestartDriver_TON.IN:=TRUE;
 			IF RestartDriver_TON.Q THEN
 				RestartDriver_State:=1;
