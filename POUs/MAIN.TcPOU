@@ -384,7 +384,11 @@ Unreach_LS_Near:=LS_TopNear;
     </Action>
     <Action Name="A_CheckLinearEncoder" Id="{04ef6a41-e2ba-498d-aa00-f823237bb5de}" FolderPath="Check\">
       <Implementation>
-        <ST><![CDATA[//如果没有使用光栅、或者光栅参数没设置好，则不检查光栅位置
+        <ST><![CDATA[//LEProtectionPosition
+min_UserLEProtectionGapPosition:=min_UserGapPositionNew-min_ThresholdGapSoft2LEProtection;//回程误差有0.1mm
+max_UserLEProtectionGapPosition:=max_UserGapPositionNew+max_ThresholdGapSoft2LEProtection;
+
+//如果没有使用光栅、或者光栅参数没设置好，则不检查光栅位置
 IF NOT USELinearEncoder OR NOT PositionBiasDone THEN
 	RETURN;
 END_IF
@@ -397,8 +401,6 @@ IF Pos_PhaseShifterLin <=0 THEN
 END_IF
 //
 
-min_UserLEProtectionGapPosition:=min_UserGapPositionNew-min_ThresholdGapSoft2LEProtection;//回程误差有0.1mm
-max_UserLEProtectionGapPosition:=max_UserGapPositionNew+max_ThresholdGapSoft2LEProtection;
 IF Pos_PhaseShifterLin >max_UserLEProtectionGapPosition THEN
 	ErrorID:=1105;
 	Error:=TRUE;
@@ -494,16 +496,27 @@ CASE m_GetDriveStatusState OF
 		//
 		//	//check statusGet and status configured
 		IF 	GearNumeratorGet_PhaseShifter<>GearNumeratorConfigured_PhaseShifter 
-			OR GearDenominatorGet_PhaseShifter<>GearDenominatorConfigured_PhaseShifter 
-			OR Feedback2directionGet_PhaseShifter<>Feedback2directionConfigured_PhaseShifter  THEN
+			OR GearDenominatorGet_PhaseShifter<>GearDenominatorConfigured_PhaseShifter   THEN
 				bDriveDiagMessageAndNumber:=FALSE;
 				A_GetDriverStatusMC();
 				GetDriveStatusStateDone:=FALSE;
 				GetDriveStatusStateError:=TRUE;
 				Error:=TRUE;
 				ErrorId:=1302;
-				ErrorDescription:='gearOrfb2direction Error';
+				ErrorDescription:='gearParameters Error';
 				Plc_EmergencyStop:=FALSE;
+		END_IF
+		IF USELinearEncoder THEN
+			IF  Feedback2directionGet_PhaseShifter<>Feedback2directionConfigured_PhaseShifter THEN
+					bDriveDiagMessageAndNumber:=FALSE;
+					A_GetDriverStatusMC();
+					GetDriveStatusStateDone:=FALSE;
+					GetDriveStatusStateError:=TRUE;
+					Error:=TRUE;
+					ErrorId:=1303;
+					ErrorDescription:='fb2direction Error';
+					Plc_EmergencyStop:=FALSE;
+			END_IF
 		END_IF
 		m_GetDriveStatusState:=0;
 	-100:
@@ -2821,6 +2834,8 @@ END_CASE]]></ST>
       <LineId Id="100" Count="0" />
     </LineIds>
     <LineIds Name="MAIN.A_CheckLinearEncoder">
+      <LineId Id="111" Count="1" />
+      <LineId Id="109" Count="1" />
       <LineId Id="61" Count="0" />
       <LineId Id="105" Count="0" />
       <LineId Id="59" Count="1" />
@@ -2828,7 +2843,6 @@ END_CASE]]></ST>
       <LineId Id="4" Count="3" />
       <LineId Id="2" Count="1" />
       <LineId Id="29" Count="0" />
-      <LineId Id="107" Count="1" />
       <LineId Id="106" Count="0" />
       <LineId Id="31" Count="6" />
       <LineId Id="69" Count="8" />
@@ -2838,7 +2852,15 @@ END_CASE]]></ST>
     <LineIds Name="MAIN.A_GetDriverStatus">
       <LineId Id="222" Count="8" />
       <LineId Id="316" Count="0" />
-      <LineId Id="232" Count="83" />
+      <LineId Id="232" Count="63" />
+      <LineId Id="297" Count="8" />
+      <LineId Id="317" Count="0" />
+      <LineId Id="322" Count="0" />
+      <LineId Id="324" Count="6" />
+      <LineId Id="323" Count="0" />
+      <LineId Id="321" Count="0" />
+      <LineId Id="319" Count="0" />
+      <LineId Id="306" Count="9" />
       <LineId Id="39" Count="0" />
     </LineIds>
     <LineIds Name="MAIN.A_InitAxisParameters">
