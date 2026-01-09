@@ -84,6 +84,9 @@
     <Compile Include="POUs\CommonFB\MainFB\FB_SetAxisPosition.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\CommonFB\MainFB\FB_SetMotorAxisPosition.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\CommonFB\MainFB\FB_Stop.TcPOU">
       <SubType>Code</SubType>
     </Compile>

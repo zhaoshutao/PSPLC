@@ -17,6 +17,8 @@ VAR_GLOBAL
 (*加载配方参数*)
 	LoadRecipeParameters:BOOL;
 	loadParametersDone:BOOL;
+(*Max Velocity Global*)
+	MaxVelocityGlobalVelocity : LREAL;
 (*设置光栅bias done *)	
 	PositionBiasDone:BOOL;
 (*回程差*)
@@ -91,17 +93,39 @@ VAR_GLOBAL
 	KS_handEmergency2_Contact1:BOOL;
 	KS_handEmergency2_Contact2:BOOL;
 	KS_softEmergency2_Contact:BOOL;
+
 (*aixs_ref*)
 	PhaseShifterLin: axis_ref;
+(*aixs_ref-motor*)
+	PhaseShifterMotor: axis_ref;
 (*axis Position*)
 	Pos_PhaseShifterLin: LREAL;
-(*********)
-	LB_TestRecord:LREAL;
-	RB_TestRecord:LREAL;
+(*axis Position-motor*)
+	Pos_PhaseShifterMotor: LREAL;
+(*axis Position-Delta*)
+	DeltaPos_PhaseShifter: LREAL;
+(*axis Position-Threshold*)
+	ThresholdDeltaPos_PhaseShifter: LREAL:=0.2;
 (*axis Velocity*)
 	Velo_PhaseShifterLin: LREAL;
+(*axis Velocity-motor*)
+	Velo_PhaseShifterMotor: LREAL;
+(*axis Velocity-Delta*)
+	DeltaVelo_PhaseShifter: LREAL;
+(*axis Velocity-ThresholdDelta*)
+	ThresholdDeltaVelo_PhaseShifter: LREAL:=0.1;
+(*axis Torque-motor*)
+	Torque_PhaseShifterLin: LREAL;
+(*axis Torque-motor*)
+	Torque_PhaseShifterMotor: LREAL;
+(*axis Torque-Delta*)
+	DeltaTorque_PhaseShifter: LREAL;
 (*Lag Distance*)
 	PosDiff_PhaseShifterLin_actual: LREAL;
+(*Lag Distance-Motor*)
+	PosDiff_PhaseShifterMotor_actual: LREAL;
+(*Delta LagDistance*)
+	DeltaPosDiff_PhaseShifter_actual: LREAL;
 
 (***********************Power status and couple statatus***********************)
 	st_Power:BOOL;
@@ -127,6 +151,8 @@ VAR_GLOBAL
 	PhaseShifterLinVelocityDisplay:LREAL;
 	//
 	moveStatusPhaseShifterLin: BOOL;
+	//
+	moveStatusPhaseShifterMotor: BOOL;
 
 (******RS232************)
 	RxBufferEL			: ComBuffer;	(* Receive data buffer; used with all receive function blocks *)
