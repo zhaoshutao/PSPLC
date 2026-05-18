@@ -5,6 +5,9 @@
 VAR_GLOBAL
 (*IDControl Ready*)
 	IDControlReady:BOOL;
+(*Maintenance Mode*)
+	MaintenanceMode:BOOL;
+	MaintenanceModeLed:BOOL;
 (*RecipeDescription*)
 	RecipeSavedDate:STRING;
 	RecipeDescription:STRING;
@@ -153,6 +156,9 @@ VAR_GLOBAL
 	moveStatusPhaseShifterLin: BOOL;
 	//
 	moveStatusPhaseShifterMotor: BOOL;
+	
+		
+	moveStatusGap:BOOL;
 
 (******RS232************)
 	RxBufferEL			: ComBuffer;	(* Receive data buffer; used with all receive function blocks *)

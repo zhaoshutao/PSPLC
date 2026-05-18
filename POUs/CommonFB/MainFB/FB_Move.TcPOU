@@ -54,80 +54,82 @@ END_IF]]></ST>
     <Action Name="A_BCGapMove" Id="{14a23b8d-1d11-4027-a881-ef621e956d3f}">
       <Implementation>
         <ST><![CDATA[IF BCGapMove THEN
-BCGapBusy:=TRUE;
-BCGapDone:=FALSE;
-fb_ton_BC(PT:=t#80s);(*2mm/s max spees,120mmÐÐ³Ì£¬60sÄÚ×ßÍê*)
-A_MoveMC();
-IF  PhaseShifterLin.Status.Moving  THEN
-	GapMoving:=TRUE;
-ELSE
-	GapMoving:=FALSE;
-END_IF
-CASE BCGapState OF
-	0:
-		IF PhaseShifterLin.Status.Moving THEN	(*ÖáÕýÔÚÔËÐÐ£¬Ñ­»·¸Ã²½µÈ´ý*)
-			BCGapState:=88;
-		ELSIF PhaseShifterLin_MC_MoveAbsolute.Error THEN	(*¼ì²éMC Error*)
-			ErrorID:=2;
-			BCGapState:=99;
-		(*ELSIF ABS(Pos_LeftTopLin-GapPosition/2)<0.002 AND  ABS(Pos_LeftBottomLin-GapPosition)<0.002 THEN	(*Ä¿±êÎ»ÖÃÓëµ±Ç°Î»ÖÃÒ»Ñù£¬²»¶¯*)
-			GapState:=88;*)
-		ELSIF PhaseShifterLin.Status.NotMoving THEN	(*Öá¶¼´¦ÓÚÍ£Ö¹×´Ì¬Ê±£¬×ªÏÂÒ»²½*)
-			BCGapState:=1;
-		END_IF
-	1:
-		PhaseShifterLin_MC_MoveAbsolute.Position:=TargetGapPosition;
-		PhaseShifterLin_MC_MoveAbsolute.Velocity:=TargetGapVelocity;
-		PhaseShifterLin_MC_MoveAbsolute.Execute:=TRUE;
-		fb_ton_BC.IN:=TRUE;
-		BCGapState:=2;
-	2:
-		IF NOT PhaseShifterLin_MC_MoveAbsolute.Done THEN		(*ÔË¶¯ÖÐ£¬¼ì²éDoneÐÅºÅ£¬Ã»ÓÐÔòÑ­»·*)
+	BCGapBusy:=TRUE;
+	BCGapDone:=FALSE;
+	fb_ton_BC(PT:=t#80s);(*2mm/s max spees,120mmÐÐ³Ì£¬60sÄÚ×ßÍê*)
+	A_MoveMC();
+	IF  PhaseShifterLin.Status.Moving  THEN
+		GapMoving:=TRUE;
+	ELSE
+		GapMoving:=FALSE;
+	END_IF
+	CASE BCGapState OF
+		0:
+			IF PhaseShifterLin.Status.Moving THEN	(*ÖáÕýÔÚÔËÐÐ£¬Ñ­»·¸Ã²½µÈ´ý*)
+				BCGapState:=88;
+			ELSIF PhaseShifterLin.Status.NotMoving THEN	(*Öá¶¼´¦ÓÚÍ£Ö¹×´Ì¬Ê±£¬×ªÏÂÒ»²½*)
+				BCGapState:=1;
+			END_IF
+		1:
+			PhaseShifterLin_MC_MoveAbsolute.Position:=TargetGapPosition;
+			PhaseShifterLin_MC_MoveAbsolute.Velocity:=TargetGapVelocity;
+			PhaseShifterLin_MC_MoveAbsolute.Execute:=TRUE;
+			fb_ton_BC.IN:=TRUE;
 			BCGapState:=2;
-		ELSIF PhaseShifterLin_MC_MoveAbsolute.Done THEN		(*ÔË¶¯Íê³É£¬×ªÏÂÒ»²½*)
-			BCGapState:=88;
-		END_IF
-		(*½ÓÊÕµ½stopÐÅºÅÊ±£¬reset×´Ì¬*)
-		IF BCGapReset THEN
-			BCGapState:=89;
-		END_IF
-
-	88:
+		2:
+			IF NOT PhaseShifterLin_MC_MoveAbsolute.Done THEN		(*ÔË¶¯ÖÐ£¬¼ì²éDoneÐÅºÅ£¬Ã»ÓÐÔòÑ­»·*)
+				BCGapState:=2;
+			ELSIF PhaseShifterLin_MC_MoveAbsolute.Done THEN		(*ÔË¶¯Íê³É£¬×ªÏÂÒ»²½*)
+				BCGapState:=88;
+			END_IF
+	
+		88:
+			BCGapMove:=FALSE;
+			BCGapState:=0;
+			BCGapBusy:=FALSE;
+			BCGapDone:=TRUE;
+			Error:=FALSE;
+			ErrorID:=0;
+			PhaseShifterLin_MC_MoveAbsolute.Execute:=FALSE;
+			fb_ton_BC.IN:=FALSE;
+		89:
+			BCGapMove:=FALSE;
+			BCGapState:=0;
+			BCGapBusy:=FALSE;
+			BCGapDone:=FALSE;
+			Error:=FALSE;
+			ErrorID:=0;
+			PhaseShifterLin_MC_MoveAbsolute.Execute:=FALSE;
+			fb_ton_BC.IN:=FALSE;
+		99:
+			BCGapMove:=FALSE;
+			BCGapState:=99;
+			BCGapBusy:=FALSE;
+			BCGapDone:=FALSE;
+			Error:=TRUE;
+			PhaseShifterLin_MC_MoveAbsolute.Execute:=FALSE;
+			fb_ton_BC.IN:=FALSE;
+		-100:
+			FB_PlcEmergencyStop();
+			BCGapMove:=FALSE;
+			BCGapState:=-100;
+			BCGapBusy:=FALSE;
+			BCGapDone:=FALSE;
+			Error:=TRUE;
+			PhaseShifterLin_MC_MoveAbsolute.Execute:=FALSE;
+			fb_ton_BC.IN:=FALSE;
+	END_CASE
+	IF BCGapReset THEN
+		BCGapReset:=FALSE;
 		BCGapMove:=FALSE;
 		BCGapState:=0;
 		BCGapBusy:=FALSE;
-		BCGapDone:=TRUE;
+		BCGapDone:=FALSE;
 		Error:=FALSE;
 		ErrorID:=0;
 		PhaseShifterLin_MC_MoveAbsolute.Execute:=FALSE;
 		fb_ton_BC.IN:=FALSE;
-	89:
-		BCGapMove:=FALSE;
-		BCGapState:=0;
-		BCGapBusy:=FALSE;
-		BCGapDone:=FALSE;
-		Error:=FALSE;
-		ErrorID:=0;
-		PhaseShifterLin_MC_MoveAbsolute.Execute:=FALSE;
-		fb_ton_BC.IN:=FALSE;
-	99:
-		BCGapMove:=FALSE;
-		BCGapState:=99;
-		BCGapBusy:=FALSE;
-		BCGapDone:=FALSE;
-		Error:=TRUE;
-		PhaseShifterLin_MC_MoveAbsolute.Execute:=FALSE;
-		fb_ton_BC.IN:=FALSE;
-	-100:
-		FB_PlcEmergencyStop();
-		BCGapMove:=FALSE;
-		BCGapState:=-100;
-		BCGapBusy:=FALSE;
-		BCGapDone:=FALSE;
-		Error:=TRUE;
-		PhaseShifterLin_MC_MoveAbsolute.Execute:=FALSE;
-		fb_ton_BC.IN:=FALSE;
-END_CASE
+	END_IF
 END_IF]]></ST>
       </Implementation>
     </Action>
@@ -524,17 +526,23 @@ END_IF]]></ST>
       <LineId Id="107" Count="1" />
       <LineId Id="106" Count="0" />
       <LineId Id="11" Count="2" />
-      <LineId Id="15" Count="1" />
-      <LineId Id="18" Count="4" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="22" Count="0" />
       <LineId Id="24" Count="4" />
       <LineId Id="35" Count="0" />
       <LineId Id="38" Count="0" />
       <LineId Id="40" Count="2" />
-      <LineId Id="44" Count="16" />
+      <LineId Id="44" Count="3" />
+      <LineId Id="52" Count="8" />
       <LineId Id="64" Count="7" />
       <LineId Id="75" Count="7" />
       <LineId Id="86" Count="8" />
-      <LineId Id="98" Count="3" />
+      <LineId Id="98" Count="2" />
+      <LineId Id="110" Count="1" />
+      <LineId Id="140" Count="6" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="109" Count="0" />
+      <LineId Id="101" Count="0" />
     </LineIds>
   </POU>
 </TcPlcObject>

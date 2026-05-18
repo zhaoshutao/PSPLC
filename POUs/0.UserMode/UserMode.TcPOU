@@ -841,7 +841,9 @@ IF InitCompensationDatasDone THEN
 					FB_Move.Mode:=1;						//1.gap;2.single;3.taper;4.debug;5.BCGap&UserMode		
 					FB_Move.PowerState:=st_Power;						
 			
-					IF btn_UserGapMove THEN
+					IF btn_UserGapMove THEN				
+						moveStatusGap:=TRUE;
+						FB_Move.BCGapReset:=TRUE;
 						IF NOT st_Power THEN
 							ErrorID:=1501;
 							Error:=TRUE;
@@ -859,11 +861,12 @@ IF InitCompensationDatasDone THEN
 						//目标速度位置赋值
 						FB_Move.TargetGapPosition:=PhaseShifterLinPositionNew;
 						FB_Move.TargetGapVelocity:=UserGapVelocityNew;
-						FB_Move.BCGapMove:=TRUE;
+
 						m_state:=1;
 						FB_Move();
 					END_IF
-				1:
+				1:						
+					FB_Move.BCGapMove:=TRUE;
 					btn_UserGapMove:=FALSE;
 					FB_Move();
 					IF NOT FB_Move.BCGapDone THEN	
@@ -873,6 +876,7 @@ IF InitCompensationDatasDone THEN
 						m_state:=88;
 					END_IF
 				88:
+					moveStatusGap:=FALSE;
 					btn_UserGapMove:=FALSE;		
 					Led_Run:=FALSE;
 					m_state:=0;
@@ -884,6 +888,8 @@ IF InitCompensationDatasDone THEN
 					FB_Move.Mode:=1;						//1.gap;2.single;3.taper;4.debug;5.BCGap&UserMode;5:userMode_2		
 					FB_Move.PowerState:=st_Power;			
 					IF btn_UserGapMove THEN	
+						FB_Move.BCGapReset:=TRUE;					
+						moveStatusGap:=TRUE;
 						IF NOT st_Power THEN
 							ErrorID:=1501;
 							Error:=TRUE;
@@ -924,13 +930,13 @@ IF InitCompensationDatasDone THEN
 							LED_Error:=FALSE;	
 						END_IF										
 
-						FB_Move.BCGapMove:=TRUE;
 						FB_Move();
 						HysteresisMoving:=TRUE;		
 						n_state:=1;	
 					END_IF
 				1:
-					btn_UserGapMove:=FALSE;
+					btn_UserGapMove:=FALSE;	
+					FB_Move.BCGapMove:=TRUE;
 					FB_Move();
 					IF NOT FB_Move.BCGapDone THEN			(*还未运动到位置,运动过程中*)
 						Led_Run:=TRUE;
@@ -965,8 +971,9 @@ IF InitCompensationDatasDone THEN
 						FB_Move.BCGapMove_2:=FALSE;
 					END_IF
 					*)
-				88:
-					btn_UserGapMove:=FALSE;					
+				88:				
+					moveStatusGap:=FALSE;
+					btn_UserGapMove:=FALSE;				
 					Led_Run:=FALSE;
 					n_state:=0;
 					HysteresisMoving:=FALSE;
@@ -977,179 +984,48 @@ IF InitCompensationDatasDone THEN
 	//
 END_IF
 
-IF btn_UserGapStop OR btn_Reset THEN
-	FB_Move.BCGapReset:=TRUE;
-	FB_Move();	
-	btn_UserGapMove:=FALSE;	
-	m_state:=0;	
-	n_state:=0;	
-	HysteresisMoving:=FALSE;
-	CASE s_state OF
-			0:
-				FB_Stop.Mode:=1;	
-				FB_Stop.PowerState:=st_Power;
-				FB_Stop.BCGapStop:=TRUE;
-				FB_Stop();	
-				s_state:=1;
-			1:
-				FB_Stop();
-				IF NOT FB_Stop.BCGapDone THEN
-					s_state:=1;
-				ELSE
-					s_state:=88;
-				END_IF
-			88:
-				btn_UserGapStop:=FALSE;	
-				FB_Move.BCGapReset:=FALSE;
-				btn_reset:=FALSE;
-				s_state:=0;
-		END_CASE
-END_IF
+
+CASE s_state OF
+	0:
+		IF btn_UserGapStop OR btn_Reset THEN					
+			moveStatusGap:=FALSE;
+			m_state:=0;	
+			n_state:=0;	
+			HysteresisMoving:=FALSE;
+			
+			FB_Stop.Mode:=1;	
+			FB_Stop.PowerState:=st_Power;
+			FB_Stop.BCGapStop:=TRUE;
+			FB_Stop();	
+			s_state:=1;
+		END_IF
+	1:
+		btn_UserGapStop:=FALSE;	
+		FB_Stop();
+		IF NOT FB_Stop.BCGapDone THEN
+			s_state:=1;
+		ELSE
+			s_state:=88;
+		END_IF
+	88:
+		FB_Move.BCGapReset:=FALSE;
+		btn_reset:=FALSE;
+		s_state:=0;
+END_CASE
+
 
 (*触发限位开关后，相当于点击了Stop按钮*)
 FTrig_ReachLS(CLK:=Unreach_LS_Far AND Unreach_LS_Near);
 IF FTrig_ReachLS.Q THEN
 	btn_UserGapStop:=TRUE;
 END_IF
-
-(*
-(*Move*)
-IF InitPowerDone AND InitCompensationDatasDone THEN
-	//IF btn_UserGapMove THEN
-		(*四轴目标位置都大于当前位置，直接走到目标位置即可，不需要先走到考虑回城误差的临时位置*)
-		IF NOT TargetPosLessThanCurrentPos AND NOT HysteresisMoving THEN
-			CASE m_state OF
-				0:
-					FB_Move.Mode:=1;						//1.gap;2.single;3.taper;4.debug;5.BCGap&UserMode		
-					FB_Move.PowerState:=st_Power;							
-					FB_Move.TargetGapPosition:=PhaseShifterLinPositionNew;
-					FB_Move.TargetGapVelocity:=UserGapVelocityNew;		
-					IF btn_UserGapMove THEN
-						FB_Move.BCGapMove:=TRUE;
-						m_state:=1;
-						FB_Move();
-					END_IF
-				1:
-					btn_UserGapMove:=FALSE;
-					FB_Move();
-					IF NOT FB_Move.BCGapDone THEN			(*ÔË¶¯Î´Íê³É£¬Ñ­»·*)
-						Led_Run:=TRUE;
-						m_state:=1;
-					ELSE									(*ÔË¶¯Íê³É£¬ÏÂÒ»²½*)
-						m_state:=88;
-					END_IF
-				88:
-					btn_UserGapMove:=FALSE;					(*×´Ì¬»Ö¸´*)
-					Led_Run:=FALSE;
-					m_state:=0;
-			END_CASE
-		(*四轴有目标位置小于当前位置，先走到临时位置，再走到目标位置*)
-		ELSE
-			CASE n_state OF
-				0:
-					FB_Move.Mode:=1;		
-					FB_Move.PowerState:=st_Power;			
-					
-					//
-					IF TargetPosLessThanCurrentPos THEN			
-						FB_Move.TargetGapPosition:=PhaseShifterLinPositionNew-HysteresisError;
-					ELSE
-						FB_Move.TargetGapPosition:=PhaseShifterLinPositionNew;	
-					END_IF				
-					//
-					FB_Move.TargetGapVelocity:=UserGapVelocityNew;						
-					IF btn_UserGapMove THEN							
-						n_state:=1;
-						FB_Move.BCGapMove:=TRUE;
-						FB_Move();
-						HysteresisMoving:=TRUE;
-					END_IF
-				1:
-					btn_UserGapMove:=FALSE;
-					FB_Move();
-					IF NOT FB_Move.BCGapDone THEN			(*还未运动到位置,运动过程中*)
-						Led_Run:=TRUE;
-						n_state:=1;
-					ELSE									
-						n_state:=2;							(*转到下一步，运动到最终位置*)
-						FB_Move.BCGapMove:=FALSE;
-						//Led_Run:=FALSE;
-					END_IF
-					(*
-					IF NOT Unreach_LS_Bottom THEN
-						n_state:=2;							(*在运动过程中如果碰到下限位，则也转到下一步，运动到最终位置*)
-						FB_Move.BCGapMove_2:=FALSE;
-						FB_Move.BCGapReset_2:=TRUE;
-					END_IF
-					*)
-				2:
-					FB_Move.BCGapReset:=FALSE;
-					FB_Move.Mode:=1;		
-					FB_Move.PowerState:=st_Power;			
-					FB_Move.BCGapMove:=TRUE;
-					//直接走到目标位置，已经走到位置的，可以继续下命令，只不过它不在走了而已
-					FB_Move.TargetGapPosition:=PhaseShifterLinPositionNew;	
-					//
-					FB_Move.TargetGapVelocity:=UserGapVelocityNew;
-					FB_Move();							
-					n_state:=3;
-				3:
-					FB_Move();
-					IF NOT FB_Move.BCGapDone THEN			(*还未运动到位置,运动过程中*)
-						Led_Run:=TRUE;
-						n_state:=3;
-					ELSE									
-						n_state:=88;							(*运动到了最终位置*)
-					END_IF
-					(*
-					IF NOT Unreach_LS_Bottom THEN
-						n_state:=88;							(*在运动过程中如果碰到下限位，则也转到下一步，运动到最终位置*)
-						FB_Move.BCGapMove_2:=FALSE;
-					END_IF
-					*)
-				88:
-					btn_UserGapMove:=FALSE;					
-					Led_Run:=FALSE;
-					n_state:=0;
-					HysteresisMoving:=FALSE;
-			END_CASE
-		END_IF
-	//END_IF
-END_IF
-
-IF btn_UserGapStop THEN
-	FB_Move.BCGapReset:=TRUE;							(*¸øÔË¶¯FB¸øÍ£Ö¹ÐÅºÅ£¬Ê¹FB_Move×´Ì¬»Ö¸´*)
-	FB_Move();											(*Æô¶¯FB_Move*)
-	btn_UserGapMove:=FALSE;								(*btn_GapMove:=FALSE*)
-	m_state:=0;	
-	n_state:=0;										(*m_state:=0;*)
-	CASE s_state OF
-			0:
-				FB_Stop.Mode:=1;							(*1£ºgapÄ£Ê½£»2£ºµ¥ÁºÄ£Ê½£»3£ºtaperÄ£Ê½£»4£ºDebugÄ£Ê½£»5£ºBCGapÄ£Ê½*)
-				FB_Stop.PowerState:=st_Power;				(*µçÔ´×´Ì¬ÊäÈë*)
-				FB_Stop.BCGapStop:=TRUE;				(*Execute TRUE*)
-				FB_Stop();								(*Æô¶¯FB*)
-				s_state:=1;
-			1:
-				FB_Stop();
-				IF NOT FB_Stop.BCGapDone THEN			(*Í£Ö¹Î´Íê³É£¬Ñ­»·*)
-					s_state:=1;
-				ELSE									(*Í£Ö¹Íê³É£¬ÏÂÒ»²½*)
-					s_state:=88;
-				END_IF
-			88:
-				btn_UserGapStop:=FALSE;						(*»Ö¸´×´Ì¬*)
-				FB_Move.BCGapReset:=FALSE;				(*ÔËÐÐFB*)
-				s_state:=0;
-		END_CASE
-END_IF
-
-(*触发限位开关后，相当于点击了Stop按钮*)
-FTrig_ReachLS(CLK:=Unreach_LS_Near AND Unreach_LS_Far);
-IF FTrig_ReachLS.Q THEN
+(*触发限位后，如果继续向前运动，点击move，则相当于点击stop，用于恢复move的状态位*)
+IF NOT Unreach_LS_Far AND btn_UserGapMove AND UserGapPositionNew >= UserGapPositionDisplay THEN
 	btn_UserGapStop:=TRUE;
 END_IF
-*)]]></ST>
+IF NOT Unreach_LS_Near AND btn_UserGapMove AND UserGapPositionNew <= UserGapPositionDisplay THEN
+	btn_UserGapStop:=TRUE;
+END_IF]]></ST>
       </Implementation>
     </Action>
     <Action Name="A_SpectroscopyScanningMotion" Id="{6676a965-5ff1-46e4-b651-02d2762b99bc}">
@@ -1466,42 +1342,49 @@ END_IF
       <LineId Id="297" Count="0" />
       <LineId Id="580" Count="0" />
       <LineId Id="582" Count="6" />
-      <LineId Id="590" Count="17" />
+      <LineId Id="590" Count="1" />
+      <LineId Id="827" Count="1" />
+      <LineId Id="592" Count="15" />
       <LineId Id="611" Count="0" />
       <LineId Id="822" Count="0" />
-      <LineId Id="623" Count="22" />
-      <LineId Id="647" Count="16" />
+      <LineId Id="623" Count="4" />
+      <LineId Id="829" Count="0" />
+      <LineId Id="628" Count="8" />
+      <LineId Id="830" Count="1" />
+      <LineId Id="638" Count="7" />
+      <LineId Id="647" Count="0" />
+      <LineId Id="832" Count="1" />
+      <LineId Id="648" Count="15" />
       <LineId Id="823" Count="3" />
       <LineId Id="668" Count="1" />
       <LineId Id="687" Count="2" />
       <LineId Id="693" Count="0" />
       <LineId Id="700" Count="13" />
-      <LineId Id="720" Count="19" />
+      <LineId Id="721" Count="4" />
+      <LineId Id="834" Count="1" />
+      <LineId Id="726" Count="0" />
+      <LineId Id="728" Count="11" />
       <LineId Id="741" Count="2" />
       <LineId Id="747" Count="0" />
-      <LineId Id="758" Count="39" />
-      <LineId Id="799" Count="22" />
+      <LineId Id="758" Count="17" />
+      <LineId Id="836" Count="1" />
+      <LineId Id="776" Count="0" />
+      <LineId Id="778" Count="9" />
+      <LineId Id="794" Count="2" />
+      <LineId Id="839" Count="0" />
+      <LineId Id="846" Count="0" />
+      <LineId Id="843" Count="1" />
+      <LineId Id="838" Count="0" />
+      <LineId Id="845" Count="0" />
+      <LineId Id="797" Count="0" />
+      <LineId Id="799" Count="3" />
+      <LineId Id="848" Count="0" />
+      <LineId Id="803" Count="0" />
+      <LineId Id="847" Count="0" />
+      <LineId Id="804" Count="6" />
+      <LineId Id="812" Count="9" />
       <LineId Id="581" Count="0" />
-      <LineId Id="337" Count="0" />
-      <LineId Id="33" Count="8" />
-      <LineId Id="43" Count="2" />
-      <LineId Id="52" Count="5" />
-      <LineId Id="216" Count="0" />
-      <LineId Id="58" Count="16" />
-      <LineId Id="76" Count="7" />
-      <LineId Id="102" Count="0" />
-      <LineId Id="106" Count="0" />
-      <LineId Id="108" Count="6" />
-      <LineId Id="218" Count="0" />
-      <LineId Id="115" Count="18" />
-      <LineId Id="135" Count="3" />
-      <LineId Id="142" Count="0" />
-      <LineId Id="146" Count="35" />
-      <LineId Id="183" Count="15" />
-      <LineId Id="1" Count="0" />
-      <LineId Id="204" Count="0" />
-      <LineId Id="200" Count="3" />
-      <LineId Id="199" Count="0" />
+      <LineId Id="849" Count="5" />
       <LineId Id="338" Count="0" />
     </LineIds>
     <LineIds Name="UserMode.A_SpectroscopyScanningMotion">

@@ -239,9 +239,21 @@ VAR
 	
 	btn_SetMotorAxisPosition: BOOL;
 	MonitorMotorAndLEFunctionOn:BOOL:=TRUE;
+	
+	(*GetMotorTempture*)
+	MotorTemperature AT %I*:ARRAY[0..1] OF UINT;
+	MotorTemperature_PS:LREAL;
 END_VAR]]></Declaration>
     <Implementation>
-      <ST><![CDATA[(*加载Ricipe参数*)
+      <ST><![CDATA[(*MaintenanceMode*)
+IF MaintenanceMode THEN
+	MaintenanceModeLed:=TRUE;
+	RETURN;
+ELSE
+	MaintenanceModeLed:=FALSE;	
+END_IF
+
+(*加载Ricipe参数*)
 A_InitRecipeParameters();
 (*Restart TwinCAT*)
 IF Global_Variables.m_restartTC THEN
@@ -2053,6 +2065,11 @@ END_CASE
         </NWL>
       </Implementation>
     </Action>
+    <Action Name="A_GetMotorTemperature" Id="{177f6aa7-fb59-4f66-a7a6-1b4260347e60}" FolderPath="Axis\">
+      <Implementation>
+        <ST><![CDATA[MotorTemperature_PS:=UINT_TO_LREAL(MotorTemperature[0])/10;]]></ST>
+      </Implementation>
+    </Action>
     <Action Name="A_InitAxisParameters" Id="{a92c2dd6-12b0-4a71-a4bc-d7afbc965cb4}" FolderPath="Axis\">
       <Implementation>
         <ST><![CDATA[//LE	
@@ -3086,6 +3103,8 @@ END_CASE
       </Implementation>
     </Action>
     <LineIds Name="MAIN">
+      <LineId Id="3204" Count="5" />
+      <LineId Id="3202" Count="1" />
       <LineId Id="2277" Count="3" />
       <LineId Id="2374" Count="0" />
       <LineId Id="2379" Count="0" />
@@ -3200,6 +3219,9 @@ END_CASE
       <LineId Id="319" Count="0" />
       <LineId Id="306" Count="9" />
       <LineId Id="39" Count="0" />
+    </LineIds>
+    <LineIds Name="MAIN.A_GetMotorTemperature">
+      <LineId Id="1" Count="0" />
     </LineIds>
     <LineIds Name="MAIN.A_InitAxisParameters">
       <LineId Id="2" Count="0" />
